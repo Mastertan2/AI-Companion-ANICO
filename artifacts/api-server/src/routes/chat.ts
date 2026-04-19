@@ -1,5 +1,15 @@
 import { Router, type IRouter } from "express";
-import { openai } from "@workspace/integrations-openai-ai-server";
+import OpenAI from "openai";
+import { logger } from "../lib/logger";
+
+if (!process.env.OPENAI_API_KEY) {
+  logger.error("OPENAI_API_KEY environment variable is not set.");
+  process.exit(1);
+}
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
 const router: IRouter = Router();
 
@@ -26,7 +36,7 @@ router.post("/chat", async (req, res): Promise<void> => {
   }
 
   const completion = await openai.chat.completions.create({
-    model: "gpt-5-mini",
+    model: "gpt-4o-mini",
     messages: [
       { role: "system", content: SYSTEM_PROMPT },
       { role: "user", content: message },
