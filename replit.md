@@ -15,6 +15,7 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - **Validation**: Zod (`zod/v4`), `drizzle-zod`
 - **API codegen**: Orval (from OpenAPI spec)
 - **Build**: esbuild (CJS bundle)
+- **AI**: Replit AI Integrations (OpenAI) — no user API key needed
 
 ## Key Commands
 
@@ -25,3 +26,18 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - `pnpm --filter @workspace/api-server run dev` — run API server locally
 
 See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details.
+
+## AI Companion Features
+
+The API server exposes an AI companion chat endpoint for elderly users:
+
+- `GET /api/` — Returns `{ "message": "Backend running" }` health check
+- `POST /api/chat` — Accepts `{ "message": "..." }`, returns `{ "reply": "..." }`
+  - Uses `gpt-5-mini` model via Replit AI Integrations proxy
+  - System prompt tuned for elderly users: simple language, short answers, patient and encouraging tone
+  - Error handling returns 400 if message field is missing/invalid
+
+### Environment Variables (auto-configured via Replit AI Integrations)
+
+- `AI_INTEGRATIONS_OPENAI_BASE_URL` — Replit proxy base URL
+- `AI_INTEGRATIONS_OPENAI_API_KEY` — Replit-managed dummy key for SDK compatibility
