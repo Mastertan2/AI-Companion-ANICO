@@ -32,6 +32,8 @@ interface AppContextValue {
   lastCheckInTime: Date | null;
   isSpeechEnabled: boolean;
   toggleSpeech: () => void;
+  recordActivity: () => void;
+  inactivityMinutesLeft: number | null;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -41,9 +43,11 @@ const STORAGE_KEYS = {
   contacts: "companion_contacts",
   lastCheckIn: "companion_last_checkin",
   speechEnabled: "companion_speech",
+  lastActivity: "companion_last_activity",
 };
 
 const CHECK_IN_INTERVAL_MS = 3 * 60 * 60 * 1000;
+const INACTIVITY_ALERT_MS = 12 * 60 * 60 * 1000;
 
 if (Platform.OS !== "web") {
   Notifications.setNotificationHandler({
@@ -57,31 +61,65 @@ if (Platform.OS !== "web") {
   });
 }
 
+const AUTO_ALERT_MESSAGES: Record<Language, string> = {
+  en: "URGENT: This is an automatic alert from the AI Companion app. Your family member has not used their phone or checked in for over 12 hours. Please check on them immediately.",
+  zh: "紧急：这是AI伴侣应用的自动提醒。您的家人已超过12小时未使用手机或签到。请立即查看。",
+  ms: "URGENT: Ini adalah amaran automatik dari aplikasi AI Companion. Ahli keluarga anda tidak menggunakan telefon atau daftar masuk selama lebih 12 jam. Sila semak segera.",
+  ta: "அவசரம்: இது AI Companion பயன்பாட்டின் தானியங்கி எச்சரிக்கை. உங்கள் குடும்ப உறுப்பினர் 12 மணி நேரத்திற்கும் மேலாக தொலைபேசியை பயன்படுத்தவில்லை. உடனடியாக சரிபார்க்கவும்.",
+};
+
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [language, setLanguageState] = useState<Language>("en");
   const [emergencyContacts, setEmergencyContacts] = useState<EmergencyContact[]>([]);
   const [isCheckInDue, setIsCheckInDue] = useState(false);
   const [lastCheckInTime, setLastCheckInTime] = useState<Date | null>(null);
   const [isSpeechEnabled, setIsSpeechEnabled] = useState(true);
+  const [inactivityMinutesLeft, setInactivityMinutesLeft] = useState<number | null>(null);
+
   const checkInTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autoAlertTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inactivityTickRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const contactsRef = useRef<EmergencyContact[]>([]);
+  const languageRef = useRef<Language>("en");
+
+  useEffect(() => {
+    contactsRef.current = emergencyContacts;
+  }, [emergencyContacts]);
+
+  useEffect(() => {
+    languageRef.current = language;
+  }, [language]);
 
   useEffect(() => {
     loadStoredData();
     if (Platform.OS !== "web") setupNotifications();
+    return () => {
+      if (checkInTimerRef.current) clearTimeout(checkInTimerRef.current);
+      if (autoAlertTimerRef.current) clearTimeout(autoAlertTimerRef.current);
+      if (inactivityTickRef.current) clearInterval(inactivityTickRef.current);
+    };
   }, []);
 
   const loadStoredData = async () => {
     try {
-      const [storedLang, storedContacts, storedCheckIn, storedSpeech] =
+      const [storedLang, storedContacts, storedCheckIn, storedSpeech, storedActivity] =
         await Promise.all([
           AsyncStorage.getItem(STORAGE_KEYS.language),
           AsyncStorage.getItem(STORAGE_KEYS.contacts),
           AsyncStorage.getItem(STORAGE_KEYS.lastCheckIn),
           AsyncStorage.getItem(STORAGE_KEYS.speechEnabled),
+          AsyncStorage.getItem(STORAGE_KEYS.lastActivity),
         ]);
 
-      if (storedLang) setLanguageState(storedLang as Language);
-      if (storedContacts) setEmergencyContacts(JSON.parse(storedContacts));
+      if (storedLang) {
+        setLanguageState(storedLang as Language);
+        languageRef.current = storedLang as Language;
+      }
+      if (storedContacts) {
+        const parsed = JSON.parse(storedContacts);
+        setEmergencyContacts(parsed);
+        contactsRef.current = parsed;
+      }
       if (storedSpeech !== null) setIsSpeechEnabled(storedSpeech === "true");
 
       if (storedCheckIn) {
@@ -96,6 +134,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       } else {
         scheduleCheckIn(CHECK_IN_INTERVAL_MS);
       }
+
+      const now = Date.now();
+      const lastActivityMs = storedActivity ? parseInt(storedActivity) : now;
+      const activityElapsed = now - lastActivityMs;
+
+      if (activityElapsed >= INACTIVITY_ALERT_MS) {
+        triggerAutoAlert();
+      } else {
+        scheduleAutoAlert(INACTIVITY_ALERT_MS - activityElapsed);
+      }
+
+      await AsyncStorage.setItem(STORAGE_KEYS.lastActivity, now.toString()).catch(() => {});
     } catch {
     }
   };
@@ -124,6 +174,54 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }, delayMs);
   }, []);
 
+  const scheduleAutoAlert = useCallback((delayMs: number) => {
+    if (autoAlertTimerRef.current) clearTimeout(autoAlertTimerRef.current);
+    if (inactivityTickRef.current) clearInterval(inactivityTickRef.current);
+
+    const endTime = Date.now() + delayMs;
+
+    inactivityTickRef.current = setInterval(() => {
+      const remaining = Math.max(0, endTime - Date.now());
+      setInactivityMinutesLeft(Math.ceil(remaining / 60000));
+      if (remaining === 0 && inactivityTickRef.current) {
+        clearInterval(inactivityTickRef.current);
+      }
+    }, 60000);
+
+    setInactivityMinutesLeft(Math.ceil(delayMs / 60000));
+
+    autoAlertTimerRef.current = setTimeout(() => {
+      triggerAutoAlert();
+    }, delayMs);
+  }, []);
+
+  const triggerAutoAlert = useCallback(() => {
+    const contacts = contactsRef.current;
+    const lang = languageRef.current;
+    const message = AUTO_ALERT_MESSAGES[lang] || AUTO_ALERT_MESSAGES.en;
+
+    if (contacts.length > 0) {
+      const phone = contacts[0].phone.replace(/\s+/g, "");
+      const encoded = encodeURIComponent(message);
+      Linking.openURL(`whatsapp://send?phone=${phone}&text=${encoded}`).catch(() =>
+        Linking.openURL(`sms:${phone}?body=${encoded}`).catch(() =>
+          Linking.openURL(`tel:${phone}`).catch(() => {})
+        )
+      );
+    }
+
+    if (Platform.OS !== "web") {
+      Notifications.scheduleNotificationAsync({
+        content: {
+          title: "⚠️ Auto-alert sent",
+          body: "Your family has been notified. You haven't been active for 12 hours.",
+          channelId: "checkin",
+        },
+        trigger: null,
+      }).catch(() => {});
+    }
+  }, []);
+
   const scheduleCheckInNotification = async () => {
     try {
       await Notifications.cancelAllScheduledNotificationsAsync();
@@ -139,14 +237,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const recordActivity = useCallback(() => {
+    const now = Date.now();
+    AsyncStorage.setItem(STORAGE_KEYS.lastActivity, now.toString()).catch(() => {});
+    scheduleAutoAlert(INACTIVITY_ALERT_MS);
+  }, [scheduleAutoAlert]);
+
   const setLanguage = useCallback(async (lang: Language) => {
     setLanguageState(lang);
+    languageRef.current = lang;
     await AsyncStorage.setItem(STORAGE_KEYS.language, lang).catch(() => {});
   }, []);
 
   const addEmergencyContact = useCallback(async (contact: EmergencyContact) => {
     setEmergencyContacts((prev) => {
       const updated = [...prev, contact];
+      contactsRef.current = updated;
       AsyncStorage.setItem(STORAGE_KEYS.contacts, JSON.stringify(updated)).catch(() => {});
       return updated;
     });
@@ -155,6 +261,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const removeEmergencyContact = useCallback(async (id: string) => {
     setEmergencyContacts((prev) => {
       const updated = prev.filter((c) => c.id !== id);
+      contactsRef.current = updated;
       AsyncStorage.setItem(STORAGE_KEYS.contacts, JSON.stringify(updated)).catch(() => {});
       return updated;
     });
@@ -166,7 +273,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setLastCheckInTime(now);
     await AsyncStorage.setItem(STORAGE_KEYS.lastCheckIn, now.toISOString()).catch(() => {});
     scheduleCheckIn(CHECK_IN_INTERVAL_MS);
-  }, [scheduleCheckIn]);
+    recordActivity();
+  }, [scheduleCheckIn, recordActivity]);
 
   const callForHelp = useCallback(() => {
     setIsCheckInDue(false);
@@ -174,7 +282,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setLastCheckInTime(now);
     AsyncStorage.setItem(STORAGE_KEYS.lastCheckIn, now.toISOString()).catch(() => {});
     scheduleCheckIn(CHECK_IN_INTERVAL_MS);
-  }, [scheduleCheckIn]);
+    recordActivity();
+  }, [scheduleCheckIn, recordActivity]);
 
   const alertChildren = useCallback((message: string) => {
     setEmergencyContacts((contacts) => {
@@ -216,6 +325,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         lastCheckInTime,
         isSpeechEnabled,
         toggleSpeech,
+        recordActivity,
+        inactivityMinutesLeft,
       }}
     >
       {children}

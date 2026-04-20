@@ -37,11 +37,18 @@ function getApiBase(): string {
   return "/api";
 }
 
+function getWebSpeechLang(lang: string): string {
+  if (lang === "zh") return "zh-CN";
+  if (lang === "ms") return "ms-MY";
+  if (lang === "ta") return "ta-IN";
+  return "en-US";
+}
+
 export default function AssistantScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { language, isSpeechEnabled } = useApp();
+  const { language, isSpeechEnabled, recordActivity } = useApp();
   const t = translations[language];
 
   const [messages, setMessages] = useState<Message[]>([]);
@@ -51,12 +58,21 @@ export default function AssistantScreen() {
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [isSpeakingTTS, setIsSpeakingTTS] = useState(false);
   const [showKeyboard, setShowKeyboard] = useState(false);
+  const [webSpeechSupported, setWebSpeechSupported] = useState(false);
+
   const recordingRef = useRef<unknown>(null);
+  const webRecognitionRef = useRef<unknown>(null);
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
 
   useEffect(() => {
+    if (Platform.OS === "web" && typeof window !== "undefined") {
+      const SR =
+        (window as Record<string, unknown>).SpeechRecognition ||
+        (window as Record<string, unknown>).webkitSpeechRecognition;
+      setWebSpeechSupported(!!SR);
+    }
     return () => {
       Speech.stop().catch(() => {});
     };
@@ -68,7 +84,7 @@ export default function AssistantScreen() {
       await Speech.stop().catch(() => {});
       setIsSpeakingTTS(true);
       Speech.speak(text, {
-        language: language === "zh" ? "zh-CN" : language === "ms" ? "ms-MY" : language === "ta" ? "ta-IN" : "en-US",
+        language: getWebSpeechLang(language),
         rate: 0.9,
         pitch: 1.0,
         onDone: () => setIsSpeakingTTS(false),
@@ -89,6 +105,7 @@ export default function AssistantScreen() {
       const trimmed = text.trim();
       if (!trimmed || isSending) return;
 
+      recordActivity();
       const userMsg: Message = { id: makeId(), role: "user", content: trimmed };
       setMessages((prev) => [userMsg, ...prev]);
       setInputText("");
@@ -103,8 +120,7 @@ export default function AssistantScreen() {
           .reverse()
           .map((m) => ({ role: m.role, content: m.content }));
 
-        const apiUrl = `${getApiBase()}/chat`;
-        const res = await fetch(apiUrl, {
+        const res = await fetch(`${getApiBase()}/chat`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ message: trimmed, history, language }),
@@ -119,24 +135,62 @@ export default function AssistantScreen() {
         };
         setMessages((prev) => [assistantMsg, ...prev]);
         speakText(data.reply);
-      } catch (err) {
+      } catch {
         const errMsg: Message = {
           id: makeId(),
           role: "assistant",
-          content: t.tapMicToSpeak.includes("tap")
-            ? "Sorry, I could not connect right now. Please check your internet and try again."
-            : "抱歉，暂时无法连接。请检查网络后再试。",
+          content: language === "zh"
+            ? "抱歉，暂时无法连接。请重试。"
+            : language === "ms"
+            ? "Maaf, tidak dapat menyambung. Sila cuba lagi."
+            : language === "ta"
+            ? "மன்னிக்கவும், இணைக்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்."
+            : "Sorry, I couldn't connect. Please try again.",
         };
         setMessages((prev) => [errMsg, ...prev]);
       } finally {
         setIsSending(false);
       }
     },
-    [isSending, messages, speakText, language, t]
+    [isSending, messages, speakText, language, recordActivity]
   );
 
-  const startRecording = async () => {
-    if (Platform.OS === "web") return;
+  /* ─── WEB SPEECH (browser SpeechRecognition API) ─── */
+  const startWebMic = useCallback(() => {
+    if (typeof window === "undefined") return;
+    const SR =
+      (window as Record<string, unknown>).SpeechRecognition ||
+      (window as Record<string, unknown>).webkitSpeechRecognition;
+    if (!SR) return;
+
+    const recognition = new (SR as new () => SpeechRecognition)();
+    recognition.lang = getWebSpeechLang(language);
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    webRecognitionRef.current = recognition;
+    setIsRecording(true);
+
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      const transcript = event.results[0]?.[0]?.transcript ?? "";
+      setIsRecording(false);
+      if (transcript.trim()) sendMessage(transcript);
+    };
+
+    recognition.onerror = () => setIsRecording(false);
+    recognition.onend = () => setIsRecording(false);
+    recognition.start();
+  }, [language, sendMessage]);
+
+  const stopWebMic = useCallback(() => {
+    if (webRecognitionRef.current) {
+      (webRecognitionRef.current as SpeechRecognition).stop();
+      webRecognitionRef.current = null;
+    }
+    setIsRecording(false);
+  }, []);
+
+  /* ─── NATIVE MIC (expo-av) ─── */
+  const startNativeMic = async () => {
     try {
       const { Audio } = await import("expo-av");
       const { status } = await Audio.requestPermissionsAsync();
@@ -147,14 +201,12 @@ export default function AssistantScreen() {
       );
       recordingRef.current = recording;
       setIsRecording(true);
-      if (Platform.OS !== "web") {
-        await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      }
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } catch {
     }
   };
 
-  const stopRecording = async () => {
+  const stopNativeMic = async () => {
     if (!recordingRef.current) return;
     setIsRecording(false);
     setIsTranscribing(true);
@@ -169,15 +221,10 @@ export default function AssistantScreen() {
         const formData = new FormData();
         formData.append("audio", { uri, type: "audio/m4a", name: "recording.m4a" } as unknown as Blob);
         formData.append("language", language);
-        const res = await fetch(`${getApiBase()}/transcribe`, {
-          method: "POST",
-          body: formData,
-        });
+        const res = await fetch(`${getApiBase()}/transcribe`, { method: "POST", body: formData });
         if (res.ok) {
           const data = (await res.json()) as { text: string };
-          if (data.text?.trim()) {
-            await sendMessage(data.text);
-          }
+          if (data.text?.trim()) await sendMessage(data.text);
         }
       }
     } catch {
@@ -186,6 +233,17 @@ export default function AssistantScreen() {
     }
   };
 
+  /* ─── Unified mic handlers ─── */
+  const handleMicPress = () => {
+    recordActivity();
+    if (Platform.OS === "web") {
+      isRecording ? stopWebMic() : startWebMic();
+    } else {
+      isRecording ? stopNativeMic() : startNativeMic();
+    }
+  };
+
+  const showMicButton = Platform.OS !== "web" || webSpeechSupported;
   const micState = isTranscribing ? "transcribing" : isRecording ? "recording" : "idle";
 
   const renderMessage = ({ item }: { item: Message }) => {
@@ -236,10 +294,7 @@ export default function AssistantScreen() {
         <TouchableOpacity
           style={[
             styles.headerBtn,
-            {
-              backgroundColor: isSpeakingTTS ? colors.primary : colors.muted,
-              borderRadius: 12,
-            },
+            { backgroundColor: isSpeakingTTS ? colors.primary : colors.muted, borderRadius: 12 },
           ]}
           onPress={isSpeakingTTS ? stopSpeaking : undefined}
           activeOpacity={0.75}
@@ -255,7 +310,6 @@ export default function AssistantScreen() {
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
-        keyboardVerticalOffset={0}
       >
         {/* MESSAGES LIST */}
         <FlatList
@@ -276,12 +330,12 @@ export default function AssistantScreen() {
           ListEmptyComponent={
             !isSending ? (
               <View style={styles.emptyState}>
-                <Feather name="mic" size={48} color={colors.accent} />
+                <Feather name="mic" size={52} color={colors.accent} />
                 <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
                   {t.tapMic}
                 </Text>
                 <Text style={[styles.emptySubtitle, { color: colors.mutedForeground }]}>
-                  {Platform.OS === "web" ? t.orTypeBelow : t.tapMicToSpeak}
+                  {showMicButton ? t.tapMicToSpeak : t.orTypeBelow}
                 </Text>
               </View>
             ) : null
@@ -295,10 +349,12 @@ export default function AssistantScreen() {
             { paddingBottom: bottomPad + 16, backgroundColor: colors.background, borderTopColor: colors.border },
           ]}
         >
-          {/* Status banner */}
+          {/* Status banners */}
           {isRecording && (
             <View style={[styles.statusBanner, { backgroundColor: colors.destructive }]}>
-              <Text style={styles.statusBannerText}>● {t.recording}  —  {t.stopRecording}</Text>
+              <Text style={styles.statusBannerText}>
+                ● {t.recording}  —  {t.stopRecording}
+              </Text>
             </View>
           )}
           {isTranscribing && (
@@ -309,23 +365,22 @@ export default function AssistantScreen() {
             </View>
           )}
 
-          {/* BIG MIC BUTTON — native only */}
-          {Platform.OS !== "web" && (
+          {/* BIG MIC BUTTON */}
+          {showMicButton && (
             <View style={styles.micSection}>
               <TouchableOpacity
                 style={[
                   styles.bigMicBtn,
                   {
                     backgroundColor:
-                      micState === "recording"
-                        ? colors.destructive
-                        : micState === "transcribing"
-                        ? colors.muted
-                        : colors.primary,
-                    shadowColor: micState === "recording" ? colors.destructive : colors.primary,
+                      micState === "recording" ? colors.destructive
+                      : micState === "transcribing" ? colors.muted
+                      : colors.primary,
+                    shadowColor:
+                      micState === "recording" ? colors.destructive : colors.primary,
                   },
                 ]}
-                onPress={micState === "idle" ? startRecording : micState === "recording" ? stopRecording : undefined}
+                onPress={handleMicPress}
                 activeOpacity={0.85}
                 disabled={micState === "transcribing"}
               >
@@ -334,18 +389,22 @@ export default function AssistantScreen() {
                 ) : (
                   <Feather
                     name={micState === "recording" ? "mic-off" : "mic"}
-                    size={40}
+                    size={42}
                     color="#fff"
                   />
                 )}
               </TouchableOpacity>
               <Text style={[styles.micLabel, { color: colors.mutedForeground }]}>
-                {micState === "recording" ? t.stopRecording : micState === "transcribing" ? t.transcribing : t.tapMic}
+                {micState === "recording"
+                  ? t.stopRecording
+                  : micState === "transcribing"
+                  ? t.transcribing
+                  : t.tapMic}
               </Text>
             </View>
           )}
 
-          {/* TEXT INPUT ROW (always visible on web, toggle on native) */}
+          {/* TEXT INPUT (always on web, toggle on native) */}
           {(Platform.OS === "web" || showKeyboard) && (
             <View style={styles.textRow}>
               <TextInput
@@ -367,7 +426,8 @@ export default function AssistantScreen() {
                 style={[
                   styles.sendBtn,
                   {
-                    backgroundColor: inputText.trim() && !isSending ? colors.primary : colors.muted,
+                    backgroundColor:
+                      inputText.trim() && !isSending ? colors.primary : colors.muted,
                     borderRadius: 14,
                   },
                 ]}
@@ -388,7 +448,7 @@ export default function AssistantScreen() {
             </View>
           )}
 
-          {/* Keyboard toggle (native only) */}
+          {/* Keyboard / mic toggle (native only) */}
           {Platform.OS !== "web" && (
             <TouchableOpacity
               style={styles.keyboardToggle}
@@ -414,7 +474,6 @@ export default function AssistantScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   flex: { flex: 1 },
-
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -434,7 +493,6 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontFamily: "Inter_600SemiBold",
   },
-
   listContent: {
     paddingHorizontal: 16,
     paddingTop: 12,
@@ -463,16 +521,15 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderWidth: 1.5,
   },
-
   emptyState: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 50,
-    gap: 12,
+    gap: 14,
   },
   emptyTitle: {
-    fontSize: 24,
+    fontSize: 26,
     fontFamily: "Inter_700Bold",
     textAlign: "center",
   },
@@ -482,14 +539,12 @@ const styles = StyleSheet.create({
     textAlign: "center",
     paddingHorizontal: 32,
   },
-
   inputArea: {
     borderTopWidth: 1,
     paddingTop: 14,
     paddingHorizontal: 20,
     gap: 12,
   },
-
   statusBanner: {
     borderRadius: 10,
     paddingVertical: 10,
@@ -501,16 +556,15 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
     fontSize: 15,
   },
-
   micSection: {
     alignItems: "center",
     gap: 10,
     paddingVertical: 4,
   },
   bigMicBtn: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
+    width: 90,
+    height: 90,
+    borderRadius: 45,
     alignItems: "center",
     justifyContent: "center",
     shadowOpacity: 0.35,
@@ -522,7 +576,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: "Inter_400Regular",
   },
-
   textRow: {
     flexDirection: "row",
     alignItems: "flex-end",
@@ -543,7 +596,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-
   keyboardToggle: {
     flexDirection: "row",
     alignItems: "center",

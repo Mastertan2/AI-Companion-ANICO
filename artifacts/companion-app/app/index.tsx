@@ -59,7 +59,7 @@ export default function HomeScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { language, setLanguage, emergencyContacts, dismissCheckIn, lastCheckInTime, alertChildren } = useApp();
+  const { language, setLanguage, emergencyContacts, dismissCheckIn, lastCheckInTime, alertChildren, inactivityMinutesLeft } = useApp();
   const t = translations[language];
   const [now, setNow] = useState(Date.now());
 
@@ -296,6 +296,20 @@ export default function HomeScreen() {
               </>
             )}
           </View>
+
+          {/* Auto-alert countdown */}
+          {inactivityMinutesLeft !== null && inactivityMinutesLeft <= 120 && (
+            <View style={[styles.autoAlertBar, { backgroundColor: colors.destructive + "15", borderRadius: 10 }]}>
+              <Feather name="clock" size={13} color={colors.destructive} />
+              <Text style={[styles.autoAlertText, { color: colors.destructive }]}>
+                {inactivityMinutesLeft <= 0
+                  ? "Auto-alerting family now..."
+                  : `Auto-alert in ${inactivityMinutesLeft >= 60
+                      ? `${Math.floor(inactivityMinutesLeft / 60)}h ${inactivityMinutesLeft % 60}m`
+                      : `${inactivityMinutesLeft} min`} if no activity`}
+              </Text>
+            </View>
+          )}
         </View>
         {/* ─── END CHECK-IN SECTION ─── */}
 
@@ -485,6 +499,19 @@ const styles = StyleSheet.create({
   },
   checkInBtnGap: {
     width: 10,
+  },
+  autoAlertBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginTop: 4,
+  },
+  autoAlertText: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+    flex: 1,
   },
 
   askBtn: {
