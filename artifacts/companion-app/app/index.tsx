@@ -2,7 +2,7 @@ import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as Linking from "expo-linking";
 import { useRouter } from "expo-router";
-import React, { useMemo } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Platform,
   ScrollView,
@@ -33,14 +33,68 @@ function getGreeting(t: typeof translations["en"]): string {
   return t.greetingEvening;
 }
 
+function formatElapsedTime(date: Date | null, t: typeof translations["en"]): string {
+  if (!date) return t.checkInNever;
+  const ms = Date.now() - date.getTime();
+  const totalMins = Math.floor(ms / 60000);
+  const hours = Math.floor(totalMins / 60);
+  const mins = totalMins % 60;
+  if (hours === 0) return `${totalMins} ${t.minutesAgo}`;
+  if (mins === 0) return `${hours} ${hours === 1 ? t.hourAgo : t.hoursAgo}`;
+  return `${hours}h ${mins}m ${t.minutesAgo}`;
+}
+
+type CheckInStatus = "good" | "warning" | "due";
+
+function getCheckInStatus(lastCheckIn: Date | null): CheckInStatus {
+  if (!lastCheckIn) return "due";
+  const ms = Date.now() - lastCheckIn.getTime();
+  const hours = ms / (1000 * 60 * 60);
+  if (hours >= 3) return "due";
+  if (hours >= 2.25) return "warning";
+  return "good";
+}
+
 export default function HomeScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { language, setLanguage, emergencyContacts } = useApp();
+  const { language, setLanguage, emergencyContacts, dismissCheckIn, lastCheckInTime, alertChildren } = useApp();
   const t = translations[language];
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   const greeting = useMemo(() => getGreeting(t), [t]);
+  const elapsedText = useMemo(() => formatElapsedTime(lastCheckInTime, t), [lastCheckInTime, t, now]);
+  const checkInStatus = useMemo(() => getCheckInStatus(lastCheckInTime), [lastCheckInTime, now]);
+
+  const statusColor =
+    checkInStatus === "good" ? colors.success :
+    checkInStatus === "warning" ? colors.warning :
+    colors.destructive;
+
+  const statusLabel =
+    checkInStatus === "good" ? t.checkInStatusGood :
+    checkInStatus === "warning" ? t.checkInStatusWarning :
+    t.checkInStatusDue;
+
+  const handleCheckInNow = async () => {
+    if (Platform.OS !== "web") {
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
+    dismissCheckIn();
+  };
+
+  const handleAlertChildren = useCallback(async () => {
+    if (Platform.OS !== "web") {
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    }
+    alertChildren(t.alertMessage);
+  }, [alertChildren, t]);
 
   const handleEmergency = async () => {
     if (Platform.OS !== "web") {
@@ -175,6 +229,76 @@ export default function HomeScreen() {
           </Text>
         </View>
 
+        {/* ─── CHECK-IN SECTION ─── */}
+        <View
+          style={[
+            styles.checkInCard,
+            {
+              backgroundColor: colors.card,
+              borderColor: statusColor,
+              borderRadius: 18,
+            },
+          ]}
+        >
+          <View style={styles.checkInHeader}>
+            <View style={[styles.checkInIconWrap, { backgroundColor: statusColor }]}>
+              <Feather
+                name={checkInStatus === "good" ? "check-circle" : checkInStatus === "warning" ? "clock" : "alert-triangle"}
+                size={22}
+                color="#fff"
+              />
+            </View>
+            <View style={styles.checkInInfo}>
+              <Text style={[styles.checkInTitle, { color: colors.foreground }]}>
+                {t.checkInTitle}
+              </Text>
+              <Text style={[styles.checkInSub, { color: colors.mutedForeground }]}>
+                {t.lastCheckIn}: {elapsedText}
+              </Text>
+            </View>
+            <View style={[styles.statusBadge, { backgroundColor: statusColor + "22" }]}>
+              <Text style={[styles.statusBadgeText, { color: statusColor }]}>
+                {statusLabel}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.checkInButtons}>
+            <TouchableOpacity
+              style={[
+                styles.checkInBtn,
+                { backgroundColor: colors.success, borderRadius: 12, flex: 1 },
+              ]}
+              onPress={handleCheckInNow}
+              activeOpacity={0.85}
+            >
+              <Text style={[styles.checkInBtnText, { color: colors.successForeground }]}>
+                {t.checkInNow}
+              </Text>
+            </TouchableOpacity>
+
+            {(checkInStatus === "warning" || checkInStatus === "due") && (
+              <>
+                <View style={styles.checkInBtnGap} />
+                <TouchableOpacity
+                  style={[
+                    styles.checkInBtn,
+                    { backgroundColor: colors.warning, borderRadius: 12, flex: 1 },
+                  ]}
+                  onPress={handleAlertChildren}
+                  activeOpacity={0.85}
+                >
+                  <Feather name="send" size={16} color="#fff" style={{ marginRight: 6 }} />
+                  <Text style={[styles.checkInBtnText, { color: "#fff" }]}>
+                    {t.alertChildren}
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </View>
+        {/* ─── END CHECK-IN SECTION ─── */}
+
         <TouchableOpacity
           style={[
             styles.askBtn,
@@ -265,7 +389,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 24,
+    marginBottom: 20,
   },
   langRow: {
     flexDirection: "row",
@@ -286,23 +410,89 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   greetingSection: {
-    marginBottom: 28,
+    marginBottom: 20,
   },
   greeting: {
-    fontSize: 32,
+    fontSize: 30,
     fontFamily: "Inter_700Bold",
-    marginBottom: 6,
+    marginBottom: 4,
   },
   subtitle: {
-    fontSize: 18,
+    fontSize: 17,
     fontFamily: "Inter_400Regular",
   },
+
+  /* CHECK-IN CARD */
+  checkInCard: {
+    borderWidth: 2,
+    padding: 16,
+    marginBottom: 20,
+    shadowColor: "#000",
+    shadowOpacity: 0.07,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 3,
+  },
+  checkInHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 14,
+    gap: 12,
+  },
+  checkInIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  checkInInfo: {
+    flex: 1,
+    gap: 3,
+  },
+  checkInTitle: {
+    fontSize: 16,
+    fontFamily: "Inter_700Bold",
+  },
+  checkInSub: {
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+  },
+  statusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+  },
+  statusBadgeText: {
+    fontSize: 12,
+    fontFamily: "Inter_700Bold",
+  },
+  checkInButtons: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  checkInBtn: {
+    paddingVertical: 13,
+    paddingHorizontal: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+  },
+  checkInBtnText: {
+    fontSize: 15,
+    fontFamily: "Inter_700Bold",
+    textAlign: "center",
+  },
+  checkInBtnGap: {
+    width: 10,
+  },
+
   askBtn: {
     flexDirection: "row",
     alignItems: "center",
     paddingVertical: 22,
     paddingHorizontal: 24,
-    marginBottom: 24,
+    marginBottom: 20,
     gap: 14,
     shadowColor: "#E07B2A",
     shadowOpacity: 0.3,
@@ -315,9 +505,7 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontFamily: "Inter_700Bold",
   },
-  grid: {
-    gap: 0,
-  },
+  grid: {},
   gridRow: {
     flexDirection: "row",
   },

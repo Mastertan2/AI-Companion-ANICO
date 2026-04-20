@@ -28,6 +28,7 @@ Designed for elderly users. Available in 4 languages: English, Chinese, Malay, T
 
 ### Home Screen
 - Time-based greeting (Good morning/afternoon/evening)
+- **Check-In Card** (prominent, color-coded): shows last check-in time, status badge (green/yellow/red), "Check In Now" button, "Alert Children" WhatsApp button (appears when overdue/warning)
 - Language selector (EN / 中文 / BM / தமிழ்)
 - Large "Ask a Question" button → AI chat screen
 - 2×3 quick actions grid: Call Family, WhatsApp, Calendar, YouTube, SingPass, (spare)

@@ -33,6 +33,7 @@ function makeId(): string {
 function getApiBase(): string {
   const domain = process.env.EXPO_PUBLIC_DOMAIN;
   if (domain) return `https://${domain}/api`;
+  if (Platform.OS !== "web") return "http://localhost:8080/api";
   return "/api";
 }
 
@@ -48,40 +49,39 @@ export default function AssistantScreen() {
   const [isSending, setIsSending] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
-  const [isSpeaking, setIsSpeaking] = useState(false);
-  const recordingRef = useRef<{ stopAndUnloadAsync: () => Promise<void>; getURI: () => string | null } | null>(null);
+  const [isSpeakingTTS, setIsSpeakingTTS] = useState(false);
+  const [showKeyboard, setShowKeyboard] = useState(false);
+  const recordingRef = useRef<unknown>(null);
+
+  const topPad = Platform.OS === "web" ? 67 : insets.top;
+  const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
 
   useEffect(() => {
     return () => {
-      if (isSpeechEnabled) Speech.stop();
-      if (recordingRef.current) {
-        recordingRef.current.stopAndUnloadAsync().catch(() => {});
-      }
+      Speech.stop().catch(() => {});
     };
-  }, [isSpeechEnabled]);
+  }, []);
 
   const speakText = useCallback(
     async (text: string) => {
-      if (!isSpeechEnabled || Platform.OS === "web") return;
-      try {
-        await Speech.stop();
-        setIsSpeaking(true);
-        Speech.speak(text, {
-          language: language === "zh" ? "zh-CN" : language === "ms" ? "ms-MY" : language === "ta" ? "ta-IN" : "en-US",
-          rate: 0.9,
-          onDone: () => setIsSpeaking(false),
-          onError: () => setIsSpeaking(false),
-        });
-      } catch {
-        setIsSpeaking(false);
-      }
+      if (!isSpeechEnabled) return;
+      await Speech.stop().catch(() => {});
+      setIsSpeakingTTS(true);
+      Speech.speak(text, {
+        language: language === "zh" ? "zh-CN" : language === "ms" ? "ms-MY" : language === "ta" ? "ta-IN" : "en-US",
+        rate: 0.9,
+        pitch: 1.0,
+        onDone: () => setIsSpeakingTTS(false),
+        onError: () => setIsSpeakingTTS(false),
+        onStopped: () => setIsSpeakingTTS(false),
+      });
     },
     [isSpeechEnabled, language]
   );
 
   const stopSpeaking = async () => {
     await Speech.stop().catch(() => {});
-    setIsSpeaking(false);
+    setIsSpeakingTTS(false);
   };
 
   const sendMessage = useCallback(
@@ -103,13 +103,14 @@ export default function AssistantScreen() {
           .reverse()
           .map((m) => ({ role: m.role, content: m.content }));
 
-        const res = await fetch(`${getApiBase()}/chat`, {
+        const apiUrl = `${getApiBase()}/chat`;
+        const res = await fetch(apiUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ message: trimmed, history, language }),
         });
 
-        if (!res.ok) throw new Error("Server error");
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = (await res.json()) as { reply: string };
         const assistantMsg: Message = {
           id: makeId(),
@@ -118,18 +119,20 @@ export default function AssistantScreen() {
         };
         setMessages((prev) => [assistantMsg, ...prev]);
         speakText(data.reply);
-      } catch {
+      } catch (err) {
         const errMsg: Message = {
           id: makeId(),
           role: "assistant",
-          content: "Sorry, I couldn't connect right now. Please try again.",
+          content: t.tapMicToSpeak.includes("tap")
+            ? "Sorry, I could not connect right now. Please check your internet and try again."
+            : "抱歉，暂时无法连接。请检查网络后再试。",
         };
         setMessages((prev) => [errMsg, ...prev]);
       } finally {
         setIsSending(false);
       }
     },
-    [isSending, messages, speakText, language]
+    [isSending, messages, speakText, language, t]
   );
 
   const startRecording = async () => {
@@ -138,20 +141,16 @@ export default function AssistantScreen() {
       const { Audio } = await import("expo-av");
       const { status } = await Audio.requestPermissionsAsync();
       if (status !== "granted") return;
-
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-      });
-
+      await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
       const { recording } = await Audio.Recording.createAsync(
         Audio.RecordingOptionsPresets.HIGH_QUALITY
       );
       recordingRef.current = recording;
       setIsRecording(true);
-      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+      if (Platform.OS !== "web") {
+        await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      }
     } catch {
-      setIsRecording(false);
     }
   };
 
@@ -159,40 +158,26 @@ export default function AssistantScreen() {
     if (!recordingRef.current) return;
     setIsRecording(false);
     setIsTranscribing(true);
-
     try {
       const { Audio } = await import("expo-av");
-      await recordingRef.current.stopAndUnloadAsync();
-      const uri = recordingRef.current.getURI();
-      recordingRef.current = null;
+      const recording = recordingRef.current as InstanceType<typeof Audio.Recording>;
+      await recording.stopAndUnloadAsync();
       await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
-
-      if (!uri) {
-        setIsTranscribing(false);
-        return;
-      }
-
-      if (Platform.OS === "web") {
-        setIsTranscribing(false);
-        return;
-      }
-
-      const { fetch: expoFetch } = await import("expo/fetch");
-      const { File: ExpoFile } = await import("expo-file-system");
-
-      const audioFile = new ExpoFile(uri, "audio.m4a", { type: "audio/m4a" });
-      const form = new FormData();
-      form.append("audio", audioFile as unknown as Blob);
-
-      const res = await expoFetch(`${getApiBase()}/transcribe`, {
-        method: "POST",
-        body: form,
-      });
-
-      if (res.ok) {
-        const data = (await res.json()) as { text: string };
-        if (data.text) {
-          await sendMessage(data.text);
+      const uri = recording.getURI();
+      recordingRef.current = null;
+      if (uri) {
+        const formData = new FormData();
+        formData.append("audio", { uri, type: "audio/m4a", name: "recording.m4a" } as unknown as Blob);
+        formData.append("language", language);
+        const res = await fetch(`${getApiBase()}/transcribe`, {
+          method: "POST",
+          body: formData,
+        });
+        if (res.ok) {
+          const data = (await res.json()) as { text: string };
+          if (data.text?.trim()) {
+            await sendMessage(data.text);
+          }
         }
       }
     } catch {
@@ -201,18 +186,12 @@ export default function AssistantScreen() {
     }
   };
 
-  const topPad = Platform.OS === "web" ? 67 : insets.top;
-  const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
+  const micState = isTranscribing ? "transcribing" : isRecording ? "recording" : "idle";
 
   const renderMessage = ({ item }: { item: Message }) => {
     const isUser = item.role === "user";
     return (
-      <View
-        style={[
-          styles.msgRow,
-          { justifyContent: isUser ? "flex-end" : "flex-start" },
-        ]}
-      >
+      <View style={[styles.msgRow, { justifyContent: isUser ? "flex-end" : "flex-start" }]}>
         <View
           style={[
             styles.bubble,
@@ -227,14 +206,7 @@ export default function AssistantScreen() {
             },
           ]}
         >
-          <Text
-            style={[
-              styles.msgText,
-              {
-                color: isUser ? colors.primaryForeground : colors.foreground,
-              },
-            ]}
-          >
+          <Text style={[styles.msgText, { color: isUser ? colors.primaryForeground : colors.foreground }]}>
             {item.content}
           </Text>
         </View>
@@ -242,22 +214,17 @@ export default function AssistantScreen() {
     );
   };
 
-  const micState = isTranscribing ? "transcribing" : isRecording ? "recording" : "idle";
-
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
+      {/* HEADER */}
       <View
         style={[
           styles.header,
-          {
-            paddingTop: topPad + 8,
-            backgroundColor: colors.background,
-            borderBottomColor: colors.border,
-          },
+          { paddingTop: topPad + 8, backgroundColor: colors.background, borderBottomColor: colors.border },
         ]}
       >
         <TouchableOpacity
-          style={[styles.backBtn, { backgroundColor: colors.muted, borderRadius: 12 }]}
+          style={[styles.headerBtn, { backgroundColor: colors.muted, borderRadius: 12 }]}
           onPress={() => router.back()}
           activeOpacity={0.75}
         >
@@ -268,19 +235,19 @@ export default function AssistantScreen() {
         </Text>
         <TouchableOpacity
           style={[
-            styles.speakToggle,
+            styles.headerBtn,
             {
-              backgroundColor: isSpeaking ? colors.primary : colors.muted,
+              backgroundColor: isSpeakingTTS ? colors.primary : colors.muted,
               borderRadius: 12,
             },
           ]}
-          onPress={isSpeaking ? stopSpeaking : undefined}
+          onPress={isSpeakingTTS ? stopSpeaking : undefined}
           activeOpacity={0.75}
         >
           <Feather
-            name={isSpeaking ? "volume-x" : "volume-2"}
+            name={isSpeakingTTS ? "volume-x" : "volume-2"}
             size={20}
-            color={isSpeaking ? colors.primaryForeground : colors.mutedForeground}
+            color={isSpeakingTTS ? colors.primaryForeground : colors.mutedForeground}
           />
         </TouchableOpacity>
       </View>
@@ -290,30 +257,17 @@ export default function AssistantScreen() {
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         keyboardVerticalOffset={0}
       >
+        {/* MESSAGES LIST */}
         <FlatList
           data={messages}
-          keyExtractor={(m) => m.id}
+          keyExtractor={(item) => item.id}
           renderItem={renderMessage}
           inverted
-          contentContainerStyle={[
-            styles.listContent,
-            { paddingBottom: 16 },
-          ]}
-          showsVerticalScrollIndicator={false}
-          scrollEnabled={!!messages.length}
-          ListFooterComponent={
+          contentContainerStyle={styles.listContent}
+          ListHeaderComponent={
             isSending ? (
               <View style={styles.typingRow}>
-                <View
-                  style={[
-                    styles.typingBubble,
-                    {
-                      backgroundColor: colors.card,
-                      borderColor: colors.border,
-                      borderRadius: 18,
-                    },
-                  ]}
-                >
+                <View style={[styles.typingBubble, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: 18 }]}>
                   <ActivityIndicator size="small" color={colors.primary} />
                 </View>
               </View>
@@ -322,123 +276,135 @@ export default function AssistantScreen() {
           ListEmptyComponent={
             !isSending ? (
               <View style={styles.emptyState}>
-                <Feather name="message-circle" size={56} color={colors.muted} />
-                <Text
-                  style={[styles.emptyText, { color: colors.mutedForeground }]}
-                >
+                <Feather name="mic" size={48} color={colors.accent} />
+                <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
                   {t.tapMic}
+                </Text>
+                <Text style={[styles.emptySubtitle, { color: colors.mutedForeground }]}>
+                  {Platform.OS === "web" ? t.orTypeBelow : t.tapMicToSpeak}
                 </Text>
               </View>
             ) : null
           }
         />
 
+        {/* INPUT AREA */}
         <View
           style={[
-            styles.inputBar,
-            {
-              paddingBottom: bottomPad + 12,
-              backgroundColor: colors.background,
-              borderTopColor: colors.border,
-            },
+            styles.inputArea,
+            { paddingBottom: bottomPad + 16, backgroundColor: colors.background, borderTopColor: colors.border },
           ]}
         >
+          {/* Status banner */}
           {isRecording && (
-            <View style={[styles.recordingBanner, { backgroundColor: colors.destructive }]}>
-              <Text style={styles.recordingText}>● {t.recording} {t.stopRecording}</Text>
+            <View style={[styles.statusBanner, { backgroundColor: colors.destructive }]}>
+              <Text style={styles.statusBannerText}>● {t.recording}  —  {t.stopRecording}</Text>
             </View>
           )}
           {isTranscribing && (
-            <View style={[styles.recordingBanner, { backgroundColor: colors.muted }]}>
-              <Text style={[styles.recordingText, { color: colors.mutedForeground }]}>
+            <View style={[styles.statusBanner, { backgroundColor: colors.muted }]}>
+              <Text style={[styles.statusBannerText, { color: colors.mutedForeground }]}>
                 {t.transcribing}
               </Text>
             </View>
           )}
 
-          <View style={styles.inputRow}>
-            {Platform.OS !== "web" && (
+          {/* BIG MIC BUTTON — native only */}
+          {Platform.OS !== "web" && (
+            <View style={styles.micSection}>
               <TouchableOpacity
                 style={[
-                  styles.micBtn,
+                  styles.bigMicBtn,
                   {
                     backgroundColor:
                       micState === "recording"
                         ? colors.destructive
                         : micState === "transcribing"
                         ? colors.muted
-                        : colors.secondary,
-                    borderRadius: 14,
+                        : colors.primary,
+                    shadowColor: micState === "recording" ? colors.destructive : colors.primary,
                   },
                 ]}
                 onPress={micState === "idle" ? startRecording : micState === "recording" ? stopRecording : undefined}
-                activeOpacity={0.8}
+                activeOpacity={0.85}
                 disabled={micState === "transcribing"}
               >
                 {micState === "transcribing" ? (
-                  <ActivityIndicator size="small" color={colors.mutedForeground} />
+                  <ActivityIndicator size="large" color="#fff" />
                 ) : (
                   <Feather
-                    name="mic"
-                    size={22}
-                    color={
-                      micState === "recording"
-                        ? colors.destructiveForeground
-                        : colors.primary
-                    }
+                    name={micState === "recording" ? "mic-off" : "mic"}
+                    size={40}
+                    color="#fff"
                   />
                 )}
               </TouchableOpacity>
-            )}
+              <Text style={[styles.micLabel, { color: colors.mutedForeground }]}>
+                {micState === "recording" ? t.stopRecording : micState === "transcribing" ? t.transcribing : t.tapMic}
+              </Text>
+            </View>
+          )}
 
-            <TextInput
-              style={[
-                styles.input,
-                {
-                  backgroundColor: colors.muted,
-                  color: colors.foreground,
-                  borderRadius: 14,
-                },
-              ]}
-              value={inputText}
-              onChangeText={setInputText}
-              placeholder={t.typeMessage}
-              placeholderTextColor={colors.mutedForeground}
-              multiline
-              maxLength={500}
-              returnKeyType="send"
-              onSubmitEditing={() => sendMessage(inputText)}
-              blurOnSubmit={false}
-            />
+          {/* TEXT INPUT ROW (always visible on web, toggle on native) */}
+          {(Platform.OS === "web" || showKeyboard) && (
+            <View style={styles.textRow}>
+              <TextInput
+                style={[
+                  styles.textInput,
+                  { backgroundColor: colors.muted, color: colors.foreground, borderRadius: 14 },
+                ]}
+                value={inputText}
+                onChangeText={setInputText}
+                placeholder={t.typeMessage}
+                placeholderTextColor={colors.mutedForeground}
+                multiline
+                maxLength={500}
+                returnKeyType="send"
+                onSubmitEditing={() => sendMessage(inputText)}
+                blurOnSubmit={false}
+              />
+              <TouchableOpacity
+                style={[
+                  styles.sendBtn,
+                  {
+                    backgroundColor: inputText.trim() && !isSending ? colors.primary : colors.muted,
+                    borderRadius: 14,
+                  },
+                ]}
+                onPress={() => sendMessage(inputText)}
+                activeOpacity={0.8}
+                disabled={!inputText.trim() || isSending}
+              >
+                {isSending ? (
+                  <ActivityIndicator size="small" color={colors.primaryForeground} />
+                ) : (
+                  <Feather
+                    name="send"
+                    size={22}
+                    color={inputText.trim() ? colors.primaryForeground : colors.mutedForeground}
+                  />
+                )}
+              </TouchableOpacity>
+            </View>
+          )}
 
+          {/* Keyboard toggle (native only) */}
+          {Platform.OS !== "web" && (
             <TouchableOpacity
-              style={[
-                styles.sendBtn,
-                {
-                  backgroundColor:
-                    inputText.trim() && !isSending
-                      ? colors.primary
-                      : colors.muted,
-                  borderRadius: 14,
-                },
-              ]}
-              onPress={() => sendMessage(inputText)}
-              activeOpacity={0.8}
-              disabled={!inputText.trim() || isSending}
+              style={styles.keyboardToggle}
+              onPress={() => setShowKeyboard((v) => !v)}
+              activeOpacity={0.7}
             >
-              {isSending ? (
-                <ActivityIndicator size="small" color={colors.primaryForeground} />
-              ) : (
-                <Feather
-                  name="send"
-                  size={20}
-                  color={
-                    inputText.trim() ? colors.primaryForeground : colors.mutedForeground
-                  }
-                />
-              )}
+              <Feather
+                name={showKeyboard ? "mic" : "keyboard"}
+                size={18}
+                color={colors.mutedForeground}
+              />
+              <Text style={[styles.keyboardToggleText, { color: colors.mutedForeground }]}>
+                {showKeyboard ? t.tapMic : t.orTypeBelow}
+              </Text>
             </TouchableOpacity>
-          </View>
+          )}
         </View>
       </KeyboardAvoidingView>
     </View>
@@ -448,6 +414,7 @@ export default function AssistantScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   flex: { flex: 1 },
+
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -456,7 +423,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     gap: 12,
   },
-  backBtn: {
+  headerBtn: {
     width: 42,
     height: 42,
     alignItems: "center",
@@ -467,12 +434,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontFamily: "Inter_600SemiBold",
   },
-  speakToggle: {
-    width: 42,
-    height: 42,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+
   listContent: {
     paddingHorizontal: 16,
     paddingTop: 12,
@@ -501,47 +463,72 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderWidth: 1.5,
   },
+
   emptyState: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 60,
-    gap: 16,
+    paddingVertical: 50,
+    gap: 12,
   },
-  emptyText: {
-    fontSize: 18,
-    fontFamily: "Inter_400Regular",
+  emptyTitle: {
+    fontSize: 24,
+    fontFamily: "Inter_700Bold",
     textAlign: "center",
   },
-  inputBar: {
-    paddingHorizontal: 16,
-    paddingTop: 10,
-    borderTopWidth: 1,
+  emptySubtitle: {
+    fontSize: 16,
+    fontFamily: "Inter_400Regular",
+    textAlign: "center",
+    paddingHorizontal: 32,
   },
-  recordingBanner: {
+
+  inputArea: {
+    borderTopWidth: 1,
+    paddingTop: 14,
+    paddingHorizontal: 20,
+    gap: 12,
+  },
+
+  statusBanner: {
     borderRadius: 10,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    marginBottom: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
     alignItems: "center",
   },
-  recordingText: {
+  statusBannerText: {
     color: "#fff",
     fontFamily: "Inter_600SemiBold",
     fontSize: 15,
   },
-  inputRow: {
+
+  micSection: {
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 4,
+  },
+  bigMicBtn: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowOpacity: 0.35,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 8,
+  },
+  micLabel: {
+    fontSize: 15,
+    fontFamily: "Inter_400Regular",
+  },
+
+  textRow: {
     flexDirection: "row",
     alignItems: "flex-end",
     gap: 10,
   },
-  micBtn: {
-    width: 48,
-    height: 48,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  input: {
+  textInput: {
     flex: 1,
     minHeight: 48,
     maxHeight: 120,
@@ -551,9 +538,21 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
   },
   sendBtn: {
-    width: 48,
-    height: 48,
+    width: 52,
+    height: 52,
     alignItems: "center",
     justifyContent: "center",
+  },
+
+  keyboardToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 4,
+  },
+  keyboardToggleText: {
+    fontSize: 14,
+    fontFamily: "Inter_400Regular",
   },
 });

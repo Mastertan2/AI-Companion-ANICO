@@ -37,13 +37,25 @@ export interface Translations {
   permissionRequired: string;
   openSettings: string;
   checkIn: string;
+  checkInTitle: string;
   checkInPrompt: string;
   checkInFine: string;
   checkInHelp: string;
   checkInAlertSent: string;
   lastCheckIn: string;
+  checkInNow: string;
+  alertChildren: string;
+  alertMessage: string;
+  checkInStatusGood: string;
+  checkInStatusWarning: string;
+  checkInStatusDue: string;
+  checkInNever: string;
+  minutesAgo: string;
+  hourAgo: string;
+  hoursAgo: string;
   languageLabel: string;
   tapMic: string;
+  tapMicToSpeak: string;
   recording: string;
   stopRecording: string;
   transcribing: string;
@@ -51,6 +63,7 @@ export interface Translations {
   stopSpeaking: string;
   cancel: string;
   confirmRemove: string;
+  orTypeBelow: string;
 }
 
 export const translations: Record<Language, Translations> = {
@@ -91,13 +104,25 @@ export const translations: Record<Language, Translations> = {
     permissionRequired: "Contacts permission is needed to select a contact.",
     openSettings: "Open Settings",
     checkIn: "Check-In",
+    checkInTitle: "3-Hour Check-In",
     checkInPrompt: "Hi! It's been 3 hours since your last check-in. Are you doing okay?",
     checkInFine: "Yes, I'm okay!",
     checkInHelp: "I need help",
     checkInAlertSent: "Your family has been notified. Help is on the way.",
     lastCheckIn: "Last check-in",
+    checkInNow: "Check In Now ✓",
+    alertChildren: "Alert Children",
+    alertMessage: "Hello! This is an alert from the AI Companion app. Please check on your loved one — they have not checked in for over 3 hours.",
+    checkInStatusGood: "All good",
+    checkInStatusWarning: "Check in soon",
+    checkInStatusDue: "Overdue!",
+    checkInNever: "Not yet today",
+    minutesAgo: "mins ago",
+    hourAgo: "hour ago",
+    hoursAgo: "hours ago",
     languageLabel: "Language",
-    tapMic: "Tap mic to speak",
+    tapMic: "Tap to speak",
+    tapMicToSpeak: "Tap the microphone to ask a question",
     recording: "Recording...",
     stopRecording: "Tap to stop",
     transcribing: "Processing...",
@@ -105,6 +130,7 @@ export const translations: Record<Language, Translations> = {
     stopSpeaking: "Stop",
     cancel: "Cancel",
     confirmRemove: "Remove this contact?",
+    orTypeBelow: "or type below",
   },
   zh: {
     greetingMorning: "早上好",
@@ -143,13 +169,25 @@ export const translations: Record<Language, Translations> = {
     permissionRequired: "需要通讯录权限才能选择联系人。",
     openSettings: "打开设置",
     checkIn: "签到",
+    checkInTitle: "3小时签到",
     checkInPrompt: "您好！距上次签到已过去3小时，您还好吗？",
     checkInFine: "我很好！",
     checkInHelp: "我需要帮助",
     checkInAlertSent: "已通知您的家人，帮助正在赶来。",
     lastCheckIn: "上次签到",
+    checkInNow: "立即签到 ✓",
+    alertChildren: "通知子女",
+    alertMessage: "您好！这是AI伴侣应用的提醒。您的家人已超过3小时未签到，请前往查看。",
+    checkInStatusGood: "一切正常",
+    checkInStatusWarning: "即将到期",
+    checkInStatusDue: "已逾期！",
+    checkInNever: "今天尚未签到",
+    minutesAgo: "分钟前",
+    hourAgo: "小时前",
+    hoursAgo: "小时前",
     languageLabel: "语言",
-    tapMic: "点击麦克风说话",
+    tapMic: "点击说话",
+    tapMicToSpeak: "点击麦克风提问",
     recording: "录音中...",
     stopRecording: "点击停止",
     transcribing: "处理中...",
@@ -157,6 +195,7 @@ export const translations: Record<Language, Translations> = {
     stopSpeaking: "停止",
     cancel: "取消",
     confirmRemove: "删除此联系人？",
+    orTypeBelow: "或在下方输入",
   },
   ms: {
     greetingMorning: "Selamat pagi",
@@ -195,13 +234,25 @@ export const translations: Record<Language, Translations> = {
     permissionRequired: "Kebenaran kenalan diperlukan untuk memilih kenalan.",
     openSettings: "Buka Tetapan",
     checkIn: "Daftar Masuk",
+    checkInTitle: "Daftar Masuk 3 Jam",
     checkInPrompt: "Hai! Sudah 3 jam sejak daftar masuk terakhir anda. Adakah anda okay?",
     checkInFine: "Ya, saya okay!",
     checkInHelp: "Saya perlukan bantuan",
     checkInAlertSent: "Keluarga anda telah diberitahu. Bantuan sedang dalam perjalanan.",
     lastCheckIn: "Daftar masuk terakhir",
+    checkInNow: "Daftar Masuk Sekarang ✓",
+    alertChildren: "Beritahu Anak",
+    alertMessage: "Salam! Ini adalah amaran dari aplikasi AI Companion. Orang tersayang anda tidak daftar masuk lebih 3 jam. Sila pergi semak.",
+    checkInStatusGood: "Semua baik",
+    checkInStatusWarning: "Daftar masuk segera",
+    checkInStatusDue: "Tertunggak!",
+    checkInNever: "Belum hari ini",
+    minutesAgo: "minit lalu",
+    hourAgo: "jam lalu",
+    hoursAgo: "jam lalu",
     languageLabel: "Bahasa",
-    tapMic: "Ketik mikrofon untuk bercakap",
+    tapMic: "Ketik untuk bercakap",
+    tapMicToSpeak: "Ketik mikrofon untuk bertanya",
     recording: "Merakam...",
     stopRecording: "Ketik untuk berhenti",
     transcribing: "Memproses...",
@@ -209,6 +260,7 @@ export const translations: Record<Language, Translations> = {
     stopSpeaking: "Berhenti",
     cancel: "Batal",
     confirmRemove: "Padam kenalan ini?",
+    orTypeBelow: "atau taip di bawah",
   },
   ta: {
     greetingMorning: "காலை வணக்கம்",
@@ -247,13 +299,25 @@ export const translations: Record<Language, Translations> = {
     permissionRequired: "தொடர்பு தேர்வு செய்ய அனுமதி தேவை.",
     openSettings: "அமைப்புகள் திற",
     checkIn: "சரிபார்ப்பு",
+    checkInTitle: "3 மணி நேர சரிபார்ப்பு",
     checkInPrompt: "வணக்கம்! கடந்த 3 மணி நேரமாக நீங்கள் சரிபார்க்கவில்லை. நலமாக இருக்கிறீர்களா?",
     checkInFine: "ஆம், நலம்!",
     checkInHelp: "எனக்கு உதவி தேவை",
     checkInAlertSent: "உங்கள் குடும்பத்தினருக்கு தெரிவிக்கப்பட்டது. உதவி வழியில் உள்ளது.",
     lastCheckIn: "கடைசி சரிபார்ப்பு",
+    checkInNow: "இப்போது சரிபார் ✓",
+    alertChildren: "குழந்தைகளை எச்சரி",
+    alertMessage: "வணக்கம்! AI Companion ஆப்பிலிருந்து எச்சரிக்கை. உங்கள் அன்பானவர் 3 மணி நேரமாக சரிபார்க்கவில்லை. தயவுசெய்து சோதிக்கவும்.",
+    checkInStatusGood: "நலம்",
+    checkInStatusWarning: "விரைவில் சரிபார்க்கவும்",
+    checkInStatusDue: "காலதாமதம்!",
+    checkInNever: "இன்று இன்னும் இல்லை",
+    minutesAgo: "நிமிடங்கள் முன்",
+    hourAgo: "மணி முன்",
+    hoursAgo: "மணி முன்",
     languageLabel: "மொழி",
-    tapMic: "பேச மைக்ரோஃபோனை தட்டவும்",
+    tapMic: "பேச தட்டவும்",
+    tapMicToSpeak: "கேள்வி கேட்க மைக்ரோஃபோனை தட்டவும்",
     recording: "பதிவாகிறது...",
     stopRecording: "நிறுத்த தட்டவும்",
     transcribing: "செயலாக்குகிறது...",
@@ -261,5 +325,6 @@ export const translations: Record<Language, Translations> = {
     stopSpeaking: "நிறுத்து",
     cancel: "ரத்து",
     confirmRemove: "இந்த தொடர்பை நீக்கவா?",
+    orTypeBelow: "அல்லது கீழே தட்டச்சு செய்க",
   },
 };

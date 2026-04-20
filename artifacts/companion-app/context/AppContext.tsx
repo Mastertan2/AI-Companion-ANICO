@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Notifications from "expo-notifications";
+import * as Linking from "expo-linking";
 import { Platform } from "react-native";
 import React, {
   createContext,
@@ -27,6 +28,7 @@ interface AppContextValue {
   isCheckInDue: boolean;
   dismissCheckIn: () => void;
   callForHelp: () => void;
+  alertChildren: (message: string) => void;
   lastCheckInTime: Date | null;
   isSpeechEnabled: boolean;
   toggleSpeech: () => void;
@@ -43,15 +45,17 @@ const STORAGE_KEYS = {
 
 const CHECK_IN_INTERVAL_MS = 3 * 60 * 60 * 1000;
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+if (Platform.OS !== "web") {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    }),
+  });
+}
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [language, setLanguageState] = useState<Language>("en");
@@ -63,7 +67,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     loadStoredData();
-    setupNotifications();
+    if (Platform.OS !== "web") setupNotifications();
   }, []);
 
   const loadStoredData = async () => {
@@ -97,7 +101,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const setupNotifications = async () => {
-    if (Platform.OS === "web") return;
     try {
       const { status } = await Notifications.requestPermissionsAsync();
       if (status !== "granted") return;
@@ -117,9 +120,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (checkInTimerRef.current) clearTimeout(checkInTimerRef.current);
     checkInTimerRef.current = setTimeout(() => {
       setIsCheckInDue(true);
-      if (Platform.OS !== "web") {
-        scheduleCheckInNotification();
-      }
+      if (Platform.OS !== "web") scheduleCheckInNotification();
     }, delayMs);
   }, []);
 
@@ -175,6 +176,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     scheduleCheckIn(CHECK_IN_INTERVAL_MS);
   }, [scheduleCheckIn]);
 
+  const alertChildren = useCallback((message: string) => {
+    setEmergencyContacts((contacts) => {
+      if (contacts.length > 0) {
+        const phone = contacts[0].phone.replace(/\s+/g, "");
+        const encoded = encodeURIComponent(message);
+        Linking.openURL(`whatsapp://send?phone=${phone}&text=${encoded}`).catch(() =>
+          Linking.openURL(`sms:${phone}?body=${encoded}`).catch(() =>
+            Linking.openURL(`tel:${phone}`).catch(() => {})
+          )
+        );
+      } else {
+        Linking.openURL("tel:999").catch(() => {});
+      }
+      return contacts;
+    });
+  }, []);
+
   const toggleSpeech = useCallback(async () => {
     setIsSpeechEnabled((prev) => {
       const next = !prev;
@@ -194,6 +212,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         isCheckInDue,
         dismissCheckIn,
         callForHelp,
+        alertChildren,
         lastCheckInTime,
         isSpeechEnabled,
         toggleSpeech,
