@@ -1,0 +1,126 @@
+-----------------------------------
+5. AI ACTION HANDLER (VERY IMPORTANT)
+-----------------------------------
+
+Create a frontend function: handleIntent(intent, action, data)
+
+This app should attempt to open NATIVE APPS (not websites) whenever possible.
+
+IMPORTANT:
+- Try to open mobile apps using deep links or intent links
+- If app cannot fully navigate, open app + show clear step-by-step guidance for elderly users
+
+-----------------------------------
+A. OPEN APPS (ANDROID-FIRST BEHAVIOR)
+-----------------------------------
+
+1. Singpass (ONLY open app, no navigation needed):
+
+Try:
+window.location.href = "intent://#Intent;package=sg.ndi.sp;end";
+
+Fallback:
+window.location.href = "https://www.singpass.gov.sg/"
+
+After opening, show instruction overlay:
+"Singpass is open. Tap 'Log in' at the bottom."
+
+-----------------------------------
+
+2. Google Maps (OPEN APP + SEARCH LOCATION)
+
+Try:
+window.location.href = "geo:0,0?q=" + destination;
+
+Fallback:
+window.location.href = "https://www.google.com/maps/search/" + destination
+
+Goal:
+- Automatically open Maps app
+- Show searched destination immediately
+
+-----------------------------------
+
+3. YouTube (OPEN APP + SEARCH MUSIC)
+
+Try:
+window.location.href = "vnd.youtube://results?search_query=" + songName;
+
+Fallback:
+window.location.href = "https://www.youtube.com/results?search_query=" + songName
+
+Goal:
+- Open YouTube app
+- Show search results directly
+
+-----------------------------------
+
+4. WhatsApp (OPEN APP + GUIDE USER)
+
+Try:
+window.location.href = "whatsapp://";
+
+Fallback:
+window.location.href = "https://wa.me/"
+
+After opening, show VERY CLEAR instructions:
+
+If user says:
+"I want to see photo John sent me"
+
+Show:
+
+Step-by-step UI:
+1. Tap the search icon 🔍 at the top
+2. Type "John"
+3. Tap the chat with John
+4. Tap the contact name at the top
+5. Tap "Media, Links and Docs"
+6. You will see all photos
+
+IMPORTANT:
+- Instructions must be BIG, SIMPLE, and step-by-step
+- Use icons and short sentences
+
+-----------------------------------
+
+B. PLAY MUSIC (SMART ACTION)
+
+When intent = play_music:
+
+- Extract songName
+- Open YouTube app using search (above)
+- Show message:
+"Playing your song on YouTube"
+
+-----------------------------------
+
+C. CALL CONTACT
+
+window.location.href = "tel:" + phoneNumber
+
+-----------------------------------
+
+D. FALLBACK (VERY IMPORTANT)
+
+If action cannot be completed:
+
+- Show simple instructions
+- Use step-by-step guidance
+- Avoid technical words
+
+Example:
+"I will help you do this step by step"
+
+-----------------------------------
+
+E. USER FEEDBACK (CRITICAL FOR ELDERLY)
+
+After every action:
+- Show confirmation message
+- Example:
+  "Opening WhatsApp for you"
+  "Searching for your location"
+  "Playing your music"
+
+- Also read it aloud using speechSynthesis

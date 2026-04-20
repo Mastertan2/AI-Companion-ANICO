@@ -1,0 +1,308 @@
+Build a mobile-first AI Companion web app using React (Vite) + Tailwind CSS.
+
+This app is designed for elderly users, so the UI must be extremely simple, with large buttons, clear text, and minimal steps.
+
+-----------------------------------
+CORE FEATURES
+-----------------------------------
+
+1. HOME SCREEN (Main Page)
+
+- Greeting text:
+"Good evening."
+"What would you like to do?"
+
+- Large central button:
+"🎤 Ask a Question"
+- Opens the Assistant page
+- Must be very large and easy to tap
+
+- Quick Action Buttons (2x2 grid):
+- 👨‍👩‍👧 Family
+- 📞 Call 999 (Emergency)
+- 📅 My Appointment
+- 💬 WhatsApp
+
+- Add a BIG RED "EMERGENCY" button at bottom:
+- When clicked → triggers:
+window.location.href = "tel:999"
+
+-----------------------------------
+2. ASSISTANT PAGE (Chat + Voice)
+-----------------------------------
+
+- Title: "How can I help?"
+
+- Chat interface:
+- User messages
+- AI responses (chat bubbles)
+
+- Input:
+- Text input box
+- Microphone button (VERY IMPORTANT)
+
+-----------------------------------
+3. VOICE FEATURES (IMPORTANT)
+-----------------------------------
+
+- Use Web Speech API:
+
+Speech-to-Text:
+- When user taps mic → start recording
+- Convert speech to text
+- Automatically send to backend
+
+Text-to-Speech:
+- AI response should be read aloud
+- Use speechSynthesis API
+- Large, clear voice
+
+-----------------------------------
+4. BACKEND CONNECTION
+-----------------------------------
+
+- Connect to existing backend:
+POST https://YOUR-REPLIT-URL.replit.app/ask
+
+Body:
+{
+"question": "user input"
+}
+
+Expected response:
+{
+"answer": "...",
+"intent": "...",
+"action": "...",
+"data": {...}
+}
+
+-----------------------------------
+-----------------------------------
+5. AI ACTION HANDLER (VERY IMPORTANT)
+-----------------------------------
+
+Create a frontend function: handleIntent(intent, action, data)
+
+This app should attempt to open NATIVE APPS (not websites) whenever possible.
+
+IMPORTANT:
+- Try to open mobile apps using deep links or intent links
+- If app cannot fully navigate, open app + show clear step-by-step guidance for elderly users
+
+-----------------------------------
+A. OPEN APPS (ANDROID-FIRST BEHAVIOR)
+-----------------------------------
+
+1. Singpass (ONLY open app, no navigation needed):
+
+Try:
+window.location.href = "intent://#Intent;package=sg.ndi.sp;end";
+
+Fallback:
+window.location.href = "https://www.singpass.gov.sg/"
+
+After opening, show instruction overlay:
+"Singpass is open. Tap 'Log in' at the bottom."
+
+-----------------------------------
+
+2. Google Maps (OPEN APP + SEARCH LOCATION)
+
+Try:
+window.location.href = "geo:0,0?q=" + destination;
+
+Fallback:
+window.location.href = "https://www.google.com/maps/search/" + destination
+
+Goal:
+- Automatically open Maps app
+- Show searched destination immediately
+
+-----------------------------------
+
+3. YouTube (OPEN APP + SEARCH MUSIC)
+
+Try:
+window.location.href = "vnd.youtube://results?search_query=" + songName;
+
+Fallback:
+window.location.href = "https://www.youtube.com/results?search_query=" + songName
+
+Goal:
+- Open YouTube app
+- Show search results directly
+-open the video
+-----------------------------------
+
+4. WhatsApp (OPEN APP + GUIDE USER)
+
+Try:
+window.location.href = "whatsapp://";
+
+Fallback:
+window.location.href = "https://wa.me/"
+
+After opening, show VERY CLEAR instructions:
+
+If user says:
+"I want to see photo John sent me"
+
+Show:
+
+Step-by-step UI:
+1. Tap the search icon 🔍 at the top
+2. Type "John"
+3. Tap the chat with John
+4. Tap the contact name at the top
+5. Tap "Media, Links and Docs"
+6. You will see all photos
+
+IMPORTANT:
+- Instructions must be BIG, SIMPLE, and step-by-step
+- Use icons and short sentences
+
+-----------------------------------
+
+B. PLAY MUSIC (SMART ACTION)
+
+When intent = play_music:
+
+- Extract songName
+- Open YouTube app using search (above)
+- Show message:
+"Playing your song on YouTube"
+
+-----------------------------------
+
+C. CALL CONTACT
+
+window.location.href = "tel:" + phoneNumber
+
+-----------------------------------
+
+D. FALLBACK (VERY IMPORTANT)
+
+If action cannot be completed:
+
+- Show simple instructions
+- Use step-by-step guidance
+- Avoid technical words
+
+Example:
+"I will help you do this step by step"
+
+-----------------------------------
+
+E. USER FEEDBACK (CRITICAL FOR ELDERLY)
+
+After every action:
+- Show confirmation message
+- Example:
+"Opening WhatsApp for you"
+"Searching for your location"
+"Playing your music"
+
+- Also read it aloud using speechSynthesis
+-----------------------------------
+6. ELDERLY CHECK-IN SYSTEM
+-----------------------------------
+
+Implement a simple check-in system:
+
+- Every 3 hours:
+Show popup:
+"Are you okay?"
+Buttons:
+✅ Yes
+❌ Need Help
+
+- Track missed check-ins:
+If user ignores 3 times AND no interaction detected:
+→ Trigger alert function
+
+- Simulate sending message:
+show alert:
+"Alerting family member..."
+
+(Optional: mock API call)
+
+-----------------------------------
+7. LANGUAGE SUPPORT
+-----------------------------------
+
+Support 4 languages:
+- English
+- Chinese
+- Malay
+- Tamil
+
+- Add language selector dropdown
+
+- Use simple translation object:
+{
+en: {...},
+zh: {...},
+ms: {...},
+ta: {...}
+}
+
+- Translate:
+- Buttons
+- Prompts
+- Responses
+
+-----------------------------------
+8. DESIGN REQUIREMENTS
+-----------------------------------
+
+- Large buttons (minimum 60px height)
+- Rounded corners (20px+)
+- Soft colors:
+- Beige background
+- Orange primary
+- Red for emergency
+
+- Font:
+- Large
+- High contrast
+
+- Spacing:
+- Very generous
+- No clutter
+
+-----------------------------------
+9. COMPONENT STRUCTURE
+-----------------------------------
+
+- pages/
+- HomePage.jsx
+- AssistantPage.jsx
+
+- components/
+- ChatBubble.jsx
+- VoiceButton.jsx
+- EmergencyButton.jsx
+- CheckInModal.jsx
+
+- utils/
+- intentHandler.js
+- translations.js
+
+-----------------------------------
+10. USER EXPERIENCE GOAL
+-----------------------------------
+
+The app should feel like:
+- A simple version of Siri or Google Assistant
+- Designed specifically for elderly users
+- Minimal thinking required
+- Voice-first interaction
+
+-----------------------------------
+IMPORTANT NOTES
+-----------------------------------
+
+- Prioritize simplicity over complexity
+- Always give feedback (loading, speaking, etc.)
+- Make everything easy to tap and understand
