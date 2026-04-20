@@ -1,0 +1,61 @@
+{
+  "expo": {
+    "name": "AI Companion",
+    "slug": "companion-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "companion-app",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/images/icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FFF8F0"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "infoPlist": {
+        "NSContactsUsageDescription": "This app needs access to your contacts to let you choose emergency contacts.",
+        "NSMicrophoneUsageDescription": "This app needs the microphone to let you speak your questions.",
+        "NSSpeechRecognitionUsageDescription": "This app needs speech recognition to understand your spoken questions."
+      }
+    },
+    "android": {
+      "permissions": [
+        "android.permission.READ_CONTACTS",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.VIBRATE"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/images/icon.png"
+    },
+    "plugins": [
+      [
+        "expo-router",
+        {
+          "origin": "https://replit.com/"
+        }
+      ],
+      "expo-font",
+      "expo-web-browser",
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "Allow $(PRODUCT_NAME) to access your contacts."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "sounds": []
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}

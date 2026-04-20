@@ -1,0 +1,27 @@
+kind = "mobile"
+previewPath = "/companion-app/"
+title = "AI Companion Mobile"
+version = "1.0.0"
+id = "artifacts/companion-app"
+router = "expo-domain"
+
+[[integratedSkills]]
+name = "expo"
+version = "1.0.0"
+
+[[services]]
+ensurePreviewReachable = "/status"
+name = "expo"
+paths = [ "/companion-app/" ]
+localPort = 19357
+
+[services.development]
+run = "pnpm --filter @workspace/companion-app run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/companion-app", "run", "build" ]
+run = [ "pnpm", "--filter", "@workspace/companion-app", "run", "serve" ]
+
+[services.env]
+PORT = "19357"
+BASE_PATH = "/companion-app/"
