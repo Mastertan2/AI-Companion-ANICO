@@ -1,0 +1,180 @@
+Upgrade the existing AI Companion app into a more functional, action-based assistant for elderly users.
+
+Keep the current UI and backend connection, but improve the following features:
+
+-----------------------------------
+1. CONTACT SYSTEM (VERY IMPORTANT)
+-----------------------------------
+
+Replace single-contact buttons with a dynamic contact list.
+
+Features:
+- Create a "Contacts" system inside the app
+- Allow user to:
+  - Add contact (name + phone number + relationship e.g. daughter, son)
+  - Store contacts in local storage
+
+Update buttons:
+
+A. WhatsApp Button:
+- When tapped:
+  → Show contact list
+  → User selects contact
+  → Open WhatsApp chat using:
+    https://wa.me/{phoneNumber}
+
+B. Call Button:
+- When tapped:
+  → Show contact list
+  → User selects contact
+  → Call using:
+    tel:{phoneNumber}
+
+- Display name clearly (e.g. "Call Daughter")
+
+-----------------------------------
+2. AI → CONTACT MAPPING
+-----------------------------------
+
+When user says:
+- "Call my daughter"
+- "Message John"
+
+AI should:
+- Match name/relationship from stored contacts
+- Return:
+{
+  intent: "call_contact",
+  action: "call",
+  data: { name: "Daughter", phone: "6591234567" }
+}
+
+Frontend:
+- Execute action immediately
+
+-----------------------------------
+3. CHECK-IN SYSTEM (UPGRADE)
+-----------------------------------
+
+Improve current check-in:
+
+A. Add Voice Response:
+- User can say:
+  "I am okay"
+  "I need help"
+
+B. Detect voice input and mark check-in as completed
+
+C. Auto Alert System:
+- If missed 3 check-ins AND no interaction:
+  → Automatically send message (no button required)
+
+Simulate sending:
+- Display:
+  "Message sent to your family"
+
+Message content:
+"Hi, I haven't heard from [User Name] for a while. Please check on them."
+
+-----------------------------------
+4. CUSTOM APP SHORTCUTS
+-----------------------------------
+
+Add "Add App" feature:
+
+- User can add:
+  - App name
+  - URL or deep link
+
+- Display as buttons on Home Screen
+
+Examples:
+- YouTube
+- Google Maps
+- HealthHub
+
+-----------------------------------
+5. GOOGLE MAP BUTTON (NEW)
+-----------------------------------
+
+Add dedicated button:
+
+- "📍 Go Somewhere"
+
+When clicked:
+- Ask user (text or voice):
+  "Where do you want to go?"
+
+Then:
+- Open:
+  https://www.google.com/maps/search/{location}
+
+-----------------------------------
+6. AI ACTION SYSTEM (CRITICAL UPGRADE)
+-----------------------------------
+
+Upgrade chatbot → ACTION AGENT
+
+AI must not only reply, but trigger actions.
+
+Supported actions:
+
+A. Maps Navigation:
+User: "I want to go Jurong Point"
+→ Open:
+https://www.google.com/maps/search/Jurong Point
+
+B. YouTube:
+User: "Play Jay Chou"
+→ Open:
+https://www.youtube.com/results?search_query=Jay Chou
+
+C. Call:
+User: "Call my daughter"
+→ Call contact
+
+D. WhatsApp:
+User: "Message John"
+→ Open WhatsApp chat
+
+-----------------------------------
+7. FRONTEND ACTION HANDLER
+-----------------------------------
+
+Create handleIntent(response):
+
+if (action === "open_maps") → open maps  
+if (action === "open_youtube") → open youtube  
+if (action === "call") → call  
+if (action === "whatsapp") → open chat  
+
+Always:
+- Speak response aloud
+- Show confirmation message
+
+-----------------------------------
+8. VOICE-FIRST EXPERIENCE
+-----------------------------------
+
+- Voice input triggers AI automatically
+- AI responds with speech
+- Minimal typing required
+
+-----------------------------------
+9. UX IMPROVEMENTS
+-----------------------------------
+
+- Large buttons
+- Clear labels (e.g. "Call Daughter")
+- Simple navigation
+- Confirmation before sensitive actions:
+  "Do you want to call your daughter?"
+
+-----------------------------------
+GOAL
+-----------------------------------
+
+Transform this app from a chatbot into a true AI assistant that:
+- Understands intent
+- Takes action automatically
+- Reduces steps for elderly users
