@@ -36,6 +36,8 @@ interface ActionResult {
   app?: string;
   name?: string;
   url?: string;
+  time?: string;
+  task?: string;
 }
 
 function makeId(): string {
@@ -64,11 +66,19 @@ function buildYouTubeUrl(query: string): string {
   return `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
 }
 
+function buildSpotifyUrl(query: string): string {
+  return `https://open.spotify.com/search/${encodeURIComponent(query)}`;
+}
+
+function buildGoogleSearchUrl(query: string): string {
+  return `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+}
+
 export default function AssistantScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { language, isSpeechEnabled, emergencyContacts, recordActivity } = useApp();
+  const { language, isSpeechEnabled, emergencyContacts, recordActivity, addReminder } = useApp();
   const t = translations[language];
 
   const [messages, setMessages] = useState<Message[]>([]);
@@ -142,6 +152,23 @@ export default function AssistantScreen() {
         return;
       }
 
+      if (type === "open_spotify" && action.query) {
+        Linking.openURL("spotify://search/" + encodeURIComponent(action.query))
+          .catch(() => Linking.openURL(buildSpotifyUrl(action.query!)).catch(() => {}));
+        return;
+      }
+
+      if (type === "google_search" && action.query) {
+        Linking.openURL(buildGoogleSearchUrl(action.query)).catch(() => {});
+        return;
+      }
+
+      if (type === "set_reminder" && action.time && action.task) {
+        await addReminder({ time: action.time, task: action.task });
+        router.push("/reminders");
+        return;
+      }
+
       if (type === "open_app") {
         switch (action.app) {
           case "singpass":
@@ -200,7 +227,9 @@ export default function AssistantScreen() {
         if (targetName) {
           matched =
             contacts.find((c) => c.name.toLowerCase() === targetName) ||
+            contacts.find((c) => c.role.toLowerCase() === targetName) ||
             contacts.find((c) => c.name.toLowerCase().includes(targetName)) ||
+            contacts.find((c) => targetName.includes(c.role.toLowerCase())) ||
             contacts.find((c) => targetName.includes(c.name.toLowerCase().split(" ")[0]));
         }
 
@@ -240,7 +269,7 @@ export default function AssistantScreen() {
         Linking.openURL(action.url).catch(() => {});
       }
     },
-    [router]
+    [addReminder, router]
   );
 
   /* ─── SEND MESSAGE ─── */
@@ -271,7 +300,7 @@ export default function AssistantScreen() {
             message: trimmed,
             history,
             language,
-            contacts: emergencyContacts.map((c) => ({ name: c.name, phone: c.phone })),
+            contacts: emergencyContacts.map((c) => ({ name: c.name, phone: c.phone, role: c.role })),
           }),
         });
 
@@ -400,10 +429,13 @@ export default function AssistantScreen() {
   /* ─── ACTION CHIP ─── */
   const renderActionChip = (action: ActionResult | null | undefined) => {
     if (!action) return null;
-    let icon: "map-pin" | "youtube" | "phone" | "message-circle" | "external-link" | "alert-circle" = "external-link";
+    let icon: "map-pin" | "youtube" | "phone" | "message-circle" | "external-link" | "alert-circle" | "search" | "music" | "calendar" = "external-link";
     let label = "Opened";
     if (action.type === "open_maps") { icon = "map-pin"; label = `Maps: ${action.query ?? ""}`; }
     if (action.type === "open_youtube") { icon = "youtube"; label = `YouTube: ${action.query ?? ""}`; }
+    if (action.type === "open_spotify") { icon = "music"; label = `Spotify: ${action.query ?? ""}`; }
+    if (action.type === "google_search") { icon = "search"; label = `Search: ${action.query ?? ""}`; }
+    if (action.type === "set_reminder") { icon = "calendar"; label = `Reminder: ${action.time ?? ""}`; }
     if (action.type === "call_contact") { icon = "phone"; label = `Called ${action.name ?? "contact"}`; }
     if (action.type === "whatsapp_contact") { icon = "message-circle"; label = `WhatsApp: ${action.name ?? ""}`; }
     if (action.type === "call_emergency") { icon = "alert-circle"; label = "Called 999"; }

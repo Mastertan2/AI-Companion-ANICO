@@ -240,16 +240,28 @@ export default function HomeScreen() {
               </TouchableOpacity>
             ))}
           </View>
-          <TouchableOpacity
-            style={[
-              styles.contactsBtn,
-              { backgroundColor: colors.muted, borderRadius: 12 },
-            ]}
-            onPress={() => router.push("/contacts")}
-            activeOpacity={0.8}
-          >
-            <Feather name="users" size={22} color={colors.primary} />
-          </TouchableOpacity>
+          <View style={styles.topActions}>
+            <TouchableOpacity
+              style={[
+                styles.contactsBtn,
+                { backgroundColor: colors.muted, borderRadius: 12 },
+              ]}
+              onPress={() => router.push("/contacts")}
+              activeOpacity={0.8}
+            >
+              <Feather name="users" size={22} color={colors.primary} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.contactsBtn,
+                { backgroundColor: colors.muted, borderRadius: 12 },
+              ]}
+              onPress={() => router.push("/settings")}
+              activeOpacity={0.8}
+            >
+              <Feather name="settings" size={22} color={colors.primary} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* ─── GREETING ─── */}
@@ -394,6 +406,20 @@ export default function HomeScreen() {
               onPress={handleSingPass}
             />
           </View>
+          <View style={styles.gridGapV} />
+          <View style={styles.gridRow}>
+            <QuickActionButton
+              icon={<Feather name="bell" size={32} color={colors.primary} />}
+              label="My Reminders"
+              onPress={() => router.push("/reminders")}
+            />
+            <View style={styles.gridGap} />
+            <QuickActionButton
+              icon={<Feather name="monitor" size={32} color={colors.primary} />}
+              label="Caregiver"
+              onPress={() => router.push("/caregiver")}
+            />
+          </View>
         </View>
       </ScrollView>
 
@@ -433,6 +459,7 @@ const styles = StyleSheet.create({
   langRow: { flexDirection: "row", gap: 6 },
   langBtn: { paddingHorizontal: 12, paddingVertical: 6 },
   langText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  topActions: { flexDirection: "row", gap: 8 },
   contactsBtn: {
     width: 44, height: 44,
     alignItems: "center", justifyContent: "center",

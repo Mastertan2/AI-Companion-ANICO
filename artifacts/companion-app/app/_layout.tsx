@@ -42,6 +42,9 @@ function RootLayoutNav() {
       <Stack.Screen name="index" />
       <Stack.Screen name="assistant" />
       <Stack.Screen name="contacts" />
+      <Stack.Screen name="settings" />
+      <Stack.Screen name="reminders" />
+      <Stack.Screen name="caregiver" />
     </Stack>
   );
 }

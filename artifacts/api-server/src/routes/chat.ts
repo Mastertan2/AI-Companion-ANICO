@@ -13,64 +13,109 @@ const openai = new OpenAI({
 
 const router: IRouter = Router();
 
-function buildSystemPrompt(contacts: Array<{ name: string; phone: string }> = []): string {
-  const contactList =
-    contacts.length > 0
-      ? contacts.map((c) => `- ${c.name}: ${c.phone}`).join("\n")
-      : "(no contacts saved)";
+function parseReminder(message: string): { task: string; time: string } | null {
+  const lower = message.toLowerCase();
+  if (!lower.includes("remind")) return null;
 
-  return `You are a warm, patient AI assistant for elderly users. Always use simple, clear language.
+  const timeMatch = lower.match(/\b(\d{1,2})(?::|\.?)(\d{2})?\s*(am|pm)?\b/);
+  if (!timeMatch) return null;
 
-IMPORTANT: You MUST ALWAYS respond with valid JSON in EXACTLY this format:
-{"reply": "...", "action": null}
+  let hour = Number(timeMatch[1]);
+  const minute = Number(timeMatch[2] ?? "00");
+  const meridiem = timeMatch[3];
+
+  if (meridiem === "pm" && hour < 12) hour += 12;
+  if (meridiem === "am" && hour === 12) hour = 0;
+  if (hour > 23 || minute > 59) return null;
+
+  const time = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+  const beforeTime = message.slice(0, message.toLowerCase().indexOf(timeMatch[0])).trim();
+  const taskMatch = beforeTime.match(/remind me to\s+(.+)$/i) || beforeTime.match(/remind me\s+(.+)$/i);
+  const task = (taskMatch?.[1] ?? beforeTime.replace(/remind me/i, "")).replace(/\s+(at|by|on)$/i, "").trim();
+  if (!task) return null;
+
+  return { task, time };
+}
+
+function parseSpotify(message: string): string | null {
+  const lower = message.toLowerCase();
+  if (!lower.includes("spotify")) return null;
+  const query = message
+    .replace(/spotify/gi, "")
+    .replace(/play/gi, "")
+    .replace(/music/gi, "")
+    .replace(/song/gi, "")
+    .replace(/\bon\b/gi, "")
+    .trim();
+  return query || "music";
+}
+
+function buildSystemPrompt(contacts: Array<{ name: string; phone: string; role?: string }> = []): string {
+  const contactList = contacts.length > 0
+    ? contacts.map((c) => `- ${c.name} (${c.role ?? "contact"}): ${c.phone}`).join("\n")
+    : "(no contacts saved)";
+
+  return `You are a warm, patient AI caregiving assistant for elderly users. Always use simple, clear language.
+
+You MUST ALWAYS respond with valid JSON in EXACTLY this shape:
+{"reply":"...","action":null}
 OR
-{"reply": "...", "action": {"type": "...", ...}}
+{"reply":"...","action":{"type":"...",...}}
 
-The "reply" value is your spoken response — short, warm, simple (max 2 sentences).
-The "action" is only included when the user wants to DO something specific.
+The reply is spoken aloud, so keep it short and gentle. Never include text outside the JSON object.
 
-SUPPORTED ACTIONS — use the correct type:
+Supported actions:
+1. Maps navigation:
+{"type":"open_maps","query":"place name"}
+Use for: "go to", "take me to", "directions to", "navigate to".
 
-1. Navigate somewhere:
-   {"type": "open_maps", "query": "place name"}
-   Triggered by: "I want to go to X", "take me to X", "directions to X", "go to X"
+2. YouTube:
+{"type":"open_youtube","query":"search term"}
+Use for: "play", "watch", "YouTube".
 
-2. Search/play YouTube:
-   {"type": "open_youtube", "query": "search term"}
-   Triggered by: "play X", "watch X", "search YouTube for X", "open YouTube"
+3. Spotify:
+{"type":"open_spotify","query":"song artist topic"}
+Use for: "play music on Spotify", "Spotify".
 
-3. Open a specific app:
-   {"type": "open_app", "app": "singpass"}   — for SingPass
-   {"type": "open_app", "app": "whatsapp"}   — to open WhatsApp (no specific contact)
-   {"type": "open_app", "app": "googlemaps"} — to open Maps (no specific place)
-   {"type": "open_app", "app": "youtube"}    — to open YouTube homepage
-   {"type": "open_app", "app": "calendar"}   — to open Calendar
-   {"type": "open_app", "app": "healthhub"}  — to open HealthHub
-   {"type": "open_app", "app": "camera"}     — to open Camera
+4. Google Search:
+{"type":"google_search","query":"search term"}
+Use for: "find", "search", "look up" when it is not a place or video/music request.
 
-4. Call a saved contact:
-   {"type": "call_contact", "name": "matched contact name"}
-   Triggered by: "call my daughter", "call John", "ring X"
+5. Open app:
+{"type":"open_app","app":"singpass"}
+{"type":"open_app","app":"whatsapp"}
+{"type":"open_app","app":"googlemaps"}
+{"type":"open_app","app":"youtube"}
+{"type":"open_app","app":"calendar"}
+{"type":"open_app","app":"healthhub"}
+{"type":"open_app","app":"camera"}
 
-5. WhatsApp a saved contact:
-   {"type": "whatsapp_contact", "name": "matched contact name"}
-   Triggered by: "message my son", "WhatsApp Sarah", "text X"
+6. Call contact:
+{"type":"call_contact","name":"exact saved contact name"}
+Use for: "call my daughter", "call John".
 
-6. Call emergency services:
-   {"type": "call_emergency"}
-   Triggered by: "call 999", "call ambulance", "call police", "emergency"
+7. WhatsApp contact:
+{"type":"whatsapp_contact","name":"exact saved contact name"}
+Use for: "message my son", "WhatsApp Sarah", "text John".
 
-USER'S SAVED CONTACTS:
+8. Emergency:
+{"type":"call_emergency"}
+Use for: emergency, ambulance, police, call 999.
+
+9. Reminder:
+{"type":"set_reminder","time":"HH:MM","task":"task text"}
+Use for: "remind me to take medicine at 8pm". Convert time to 24-hour HH:MM. If the time is unclear, action must be null and ask for the time.
+
+Saved contacts:
 ${contactList}
 
-RULES:
-- Match contact names from the saved contacts list above (case-insensitive). Use the EXACT name from the list.
-- If the user says "my daughter" or "my son", match against the contact names/relationships.
-- If no matching contact exists, say so gently and suggest they add contacts.
-- For maps: always include the full place name in "query".
-- For YouTube: put the artist/video/topic in "query".
-- NEVER include any text outside the JSON object. The entire response must be a single JSON object.
-- Respond in the same language the user is writing in (English, Chinese, Malay, Tamil).`;
+Rules:
+- Match contacts by exact name, relationship role, or obvious relationship words like daughter/son/child/doctor/friend.
+- If there are multiple possible contacts, set action null and ask which person.
+- If no contact matches, set action null and ask the user to add the contact.
+- For "Play Jay Chou", prefer YouTube unless the user specifically says Spotify.
+- For "Find receipt", use google_search.
+- Respond in the user's language (English, Chinese, Malay, Tamil).`;
 }
 
 router.get("/", (_req, res): void => {
@@ -78,11 +123,11 @@ router.get("/", (_req, res): void => {
 });
 
 router.post("/chat", async (req, res): Promise<void> => {
-  const { message, history, language, contacts } = req.body as {
+  const { message, history, contacts } = req.body as {
     message?: unknown;
     history?: Array<{ role: string; content: string }>;
     language?: string;
-    contacts?: Array<{ name: string; phone: string }>;
+    contacts?: Array<{ name: string; phone: string; role?: string }>;
   };
 
   if (!message || typeof message !== "string") {
@@ -90,16 +135,26 @@ router.post("/chat", async (req, res): Promise<void> => {
     return;
   }
 
+  const reminder = parseReminder(message);
+  if (reminder) {
+    res.json({
+      reply: `Okay, I will remind you to ${reminder.task} at ${reminder.time}.`,
+      action: { type: "set_reminder", time: reminder.time, task: reminder.task },
+    });
+    return;
+  }
+
+  const spotifyQuery = parseSpotify(message);
+  if (spotifyQuery) {
+    res.json({
+      reply: `Okay, I will open Spotify for ${spotifyQuery}.`,
+      action: { type: "open_spotify", query: spotifyQuery },
+    });
+    return;
+  }
+
   const safeHistory = Array.isArray(history)
-    ? history
-        .filter(
-          (h) =>
-            h &&
-            typeof h === "object" &&
-            (h.role === "user" || h.role === "assistant") &&
-            typeof h.content === "string"
-        )
-        .slice(-8)
+    ? history.filter((h) => h && typeof h === "object" && (h.role === "user" || h.role === "assistant") && typeof h.content === "string").slice(-8)
     : [];
 
   const safeContacts = Array.isArray(contacts)
@@ -111,17 +166,13 @@ router.post("/chat", async (req, res): Promise<void> => {
       model: "gpt-4o-mini",
       messages: [
         { role: "system", content: buildSystemPrompt(safeContacts) },
-        ...safeHistory.map((h) => ({
-          role: h.role as "user" | "assistant",
-          content: h.content,
-        })),
+        ...safeHistory.map((h) => ({ role: h.role as "user" | "assistant", content: h.content })),
         { role: "user", content: message },
       ],
       response_format: { type: "json_object" },
     });
 
-    const raw = completion.choices[0]?.message?.content ?? '{"reply": "I am here to help!", "action": null}';
-
+    const raw = completion.choices[0]?.message?.content ?? '{"reply":"I am here to help!","action":null}';
     let parsed: { reply: string; action: unknown } = { reply: "", action: null };
     try {
       parsed = JSON.parse(raw);
@@ -133,7 +184,6 @@ router.post("/chat", async (req, res): Promise<void> => {
     const action = parsed.action && typeof parsed.action === "object" ? parsed.action : null;
 
     req.log.info({ messageLength: message.length, replyLength: reply.length, hasAction: !!action }, "Chat request completed");
-
     res.json({ reply, action });
   } catch (err) {
     req.log.error({ err }, "Chat request failed");
