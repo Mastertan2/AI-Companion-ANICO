@@ -1,0 +1,256 @@
+Upgrade the existing AI Companion app into a full caregiving assistant system with privacy control, automated alerts, and cross-platform support.
+
+Maintain current stack:
+- React (Vite)
+- Tailwind CSS
+- Existing backend API (/ask or /chat)
+
+-----------------------------------
+1. PRIVACY CONTROL (SETTINGS PAGE)
+-----------------------------------
+
+Create a Settings page with Privacy Controls.
+
+Features:
+- Checkbox list to control what caregivers (children) can access:
+  [ ] Location
+  [ ] Check-in status
+  [ ] Emergency alerts
+  [ ] App activity
+  [ ] Reminders
+
+- Save preferences in localStorage
+
+Behavior:
+- When sending alerts → only include selected data
+
+-----------------------------------
+2. CONTACT SYSTEM WITH ROLES
+-----------------------------------
+
+Upgrade contacts to include:
+
+- name
+- phone
+- role: ("child", "friend", "doctor")
+
+Behavior:
+- Only contacts with role = "child" receive alerts
+- Allow adding/editing contacts
+- Store in localStorage
+
+-----------------------------------
+3. SMART CHECK-IN SYSTEM (CRITICAL)
+-----------------------------------
+
+Every 3 hours:
+
+A. Show friendly check-in message:
+- "Hope your day has been good 😊"
+- "Have you eaten?"
+- "Did you drink water?"
+- "Have you taken a short walk?"
+
+B. User can respond via:
+- Buttons: Yes / No / Need Help
+- OR Voice input:
+  "I am okay"
+  "I need help"
+
+C. Track inactivity:
+- If NO response for 6 hours:
+  → trigger automatic alert
+
+-----------------------------------
+D. AUTO ALERT SYSTEM (BACKEND REQUIRED)
+-----------------------------------
+
+Use SMS API (Twilio or Vonage) in backend.
+
+Flow:
+1. Frontend detects missed check-ins
+2. Sends request to backend:
+   POST /alert
+
+3. Backend sends SMS to all contacts where role = "child"
+
+Message:
+"Hi, I haven’t heard from [User Name] for a while. Please check on them."
+
+IMPORTANT:
+- This must be automatic (no user button required)
+
+-----------------------------------
+4. AI REMINDER SYSTEM
+-----------------------------------
+
+Enable AI to create reminders.
+
+Example:
+User: "Remind me to take medicine at 8pm"
+
+Backend returns:
+{
+  intent: "set_reminder",
+  data: { time: "20:00", task: "take medicine" }
+}
+
+Frontend:
+- Store reminders
+- Trigger notifications
+
+Add:
+- "📅 My Reminders" page
+- Show list of reminders
+
+-----------------------------------
+5. AI ACTION SYSTEM (UPGRADE TO AGENT)
+-----------------------------------
+
+AI must trigger actions, not just respond.
+
+Supported actions:
+
+A. Google Maps:
+→ Open:
+https://www.google.com/maps/search/{location}
+
+B. YouTube:
+→ Open:
+https://www.youtube.com/results?search_query={query}
+
+C. Spotify:
+→ Open:
+https://open.spotify.com/search/{query}
+
+D. Google Search:
+→ Open:
+https://www.google.com/search?q={query}
+
+E. Call Contact:
+→ tel:{phone}
+
+F. WhatsApp:
+→ https://wa.me/{phone}
+
+Examples:
+- "Go to Jurong Point" → open maps
+- "Play Jay Chou" → open YouTube/Spotify
+- "Find receipt" → Google search
+- "Call my daughter" → call
+
+-----------------------------------
+6. CROSS-PLATFORM FIX (ANDROID + IOS)
+-----------------------------------
+
+Fix compatibility issues:
+
+- Ensure icons render on BOTH Android & iOS
+- Use:
+  - emojis OR
+  - react-icons (fallback)
+
+Fix navigation:
+- Google Maps
+- WhatsApp
+- Singpass
+
+Add fallback:
+- If deep link fails → open web version
+
+-----------------------------------
+7. UI IMPROVEMENTS (ELDERLY-FIRST)
+-----------------------------------
+
+- Buttons minimum height: 70px
+- Large icons
+- High contrast colors
+- Clear labels:
+  "Call Daughter"
+  "Go to Map"
+  "Play Music"
+
+- Simple layout
+- No clutter
+
+-----------------------------------
+8. VOICE RECOGNITION IMPROVEMENT
+-----------------------------------
+
+Improve speech recognition:
+
+- Integrate SEA-LION AI (or similar API)
+- Better support:
+  - local accents
+  - mixed languages
+
+Fallback:
+- Web Speech API
+
+-----------------------------------
+9. SAFETY & UX
+-----------------------------------
+
+- Confirm sensitive actions:
+  "Do you want to call your daughter?"
+
+- Add loading state:
+  "Assistant is thinking..."
+
+- Speak all responses (text-to-speech)
+
+-----------------------------------
+10. CAREGIVER DASHBOARD
+-----------------------------------
+
+Create route:
+  /caregiver
+
+Features:
+- Display:
+  - Elderly name
+  - Last check-in time
+  - Status:
+    - Green: OK
+    - Yellow: No response
+    - Red: Emergency
+  - Last known location (if enabled)
+  - Recent alerts
+
+UI:
+- Large text
+- Very simple layout
+
+-----------------------------------
+11. DATA FLOW
+-----------------------------------
+
+- Store:
+  - check-in status
+  - contacts
+  - reminders
+
+- Sync with backend when needed
+
+-----------------------------------
+12. ACCESS CONTROL
+-----------------------------------
+
+- Caregiver accesses dashboard via:
+  https://your-app/caregiver
+
+Optional:
+- Add simple PIN protection
+
+-----------------------------------
+GOAL
+-----------------------------------
+
+Transform the app into a real AI caregiving assistant that:
+
+- Understands user intent
+- Takes action automatically
+- Monitors wellbeing
+- Alerts caregivers when needed
+- Works across Android and iOS
+- Is extremely simple for elderly users

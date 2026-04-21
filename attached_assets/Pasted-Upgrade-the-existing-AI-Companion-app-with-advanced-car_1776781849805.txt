@@ -1,0 +1,197 @@
+Upgrade the existing AI Companion app with advanced caregiving, privacy, and cross-platform features.
+
+Maintain current structure (React + Tailwind + backend API), but implement the following upgrades:
+
+-----------------------------------
+1. PRIVACY CONTROL (SETTINGS PAGE)
+-----------------------------------
+
+Add a Settings Page with Privacy Controls.
+
+Feature:
+- Allow user to choose what children/caregivers can access
+
+UI:
+- Checkbox list:
+  [ ] Location
+  [ ] Check-in status
+  [ ] Emergency alerts
+  [ ] App usage activity
+  [ ] Reminders
+
+- Save preferences in local storage
+
+Behavior:
+- When sending alerts to children:
+  → Only include selected data
+
+-----------------------------------
+2. CONTACT ROLE SYSTEM (IMPORTANT)
+-----------------------------------
+
+Upgrade contacts:
+
+- Each contact must have:
+  - name
+  - phone
+  - role (e.g. "child", "friend", "doctor")
+
+- Children contacts are used for:
+  - Alerts
+  - Emergency notifications
+
+-----------------------------------
+3. SMART CHECK-IN SYSTEM (UPGRADE)
+-----------------------------------
+
+Every 3 hours:
+
+A. Show friendly message:
+- "Hope your day has been good 😊"
+- "Have you eaten?"
+- "Have you taken a short walk?"
+- "Did you drink water?"
+
+B. Allow response via:
+- Buttons (Yes / No / Need Help)
+- OR Voice input:
+  - "I am okay"
+  - "I need help"
+
+C. Track inactivity:
+- If no response for 6 hours:
+  → Automatically trigger alert
+
+D. Auto-send message to children:
+- No button required
+
+Message:
+"Hi, I haven’t heard from [User Name] for a while. Please check on them."
+
+- Send to all contacts with role = "child"
+
+-----------------------------------
+4. AI REMINDER SYSTEM
+-----------------------------------
+
+Allow AI to set reminders.
+
+Example:
+User: "Remind me to take medicine at 8pm"
+
+Backend returns:
+{
+  intent: "set_reminder",
+  data: { time: "20:00", task: "take medicine" }
+}
+
+Frontend:
+- Store reminder
+- Trigger notification
+
+Add:
+- "📅 My Reminders" page
+- List all reminders
+
+-----------------------------------
+5. AI ACTION EXPANSION (VERY IMPORTANT)
+-----------------------------------
+
+Extend AI actions:
+
+A. Google Maps:
+→ Open maps with location
+
+B. YouTube:
+→ Open search results
+
+C. Spotify:
+→ Open Spotify search:
+  https://open.spotify.com/search/{query}
+
+D. Google Search:
+→ Open:
+  https://www.google.com/search?q={query}
+
+Examples:
+- "Find my receipt" → Google search
+- "Play relaxing music" → Spotify or YouTube
+
+-----------------------------------
+6. CROSS-PLATFORM FIX (ANDROID + IOS)
+-----------------------------------
+
+Fix UI and navigation issues:
+
+- Ensure icons show on BOTH Android and iOS
+- Replace broken icons with:
+  - emoji OR
+  - reliable icon library (e.g. react-icons)
+
+- Fix navigation issues:
+  - Google Maps
+  - Singpass
+  - WhatsApp
+
+Ensure:
+- All links work on Android Chrome
+- Add fallback links if deep links fail
+
+-----------------------------------
+7. GRAPHICS & UI (ELDERLY-FRIENDLY)
+-----------------------------------
+
+Improve UI:
+
+- Bigger buttons (min 70px height)
+- Larger icons (very clear)
+- High contrast colors
+- Simple labels:
+  - "Call Daughter"
+  - "Go to Map"
+  - "Play Music"
+
+- Avoid complex icons
+- Use emojis if needed
+
+-----------------------------------
+8. IMPROVED VOICE RECOGNITION (ACCENTS)
+-----------------------------------
+
+Integrate additional speech recognition API:
+
+Use:
+- SEA-LION AI (or similar speech model)
+
+Goal:
+- Better recognition of:
+  - local accents
+  - mixed languages (Singlish, Malay, Tamil, Chinese)
+
+Fallback:
+- If external API fails → use Web Speech API
+
+-----------------------------------
+9. SAFETY & UX IMPROVEMENTS
+-----------------------------------
+
+- Always confirm sensitive actions:
+  "Do you want to call your daughter?"
+
+- Add loading state:
+  "Assistant is thinking..."
+
+- Add voice feedback:
+  Speak all responses
+
+-----------------------------------
+10. SYSTEM GOAL
+-----------------------------------
+
+This app should behave like a real AI caregiving assistant:
+
+- Understand user intent
+- Take action automatically
+- Monitor wellbeing
+- Alert caregivers when needed
+- Be extremely simple for elderly users
