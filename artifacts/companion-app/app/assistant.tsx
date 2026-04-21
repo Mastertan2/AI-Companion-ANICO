@@ -625,7 +625,7 @@ export default function AssistantScreen() {
 
           {Platform.OS !== "web" && (
             <TouchableOpacity style={styles.keyboardToggle} onPress={() => setShowKeyboard((v) => !v)} activeOpacity={0.7}>
-              <Feather name={showKeyboard ? "mic" : "keyboard"} size={18} color={colors.mutedForeground} />
+              <Feather name={showKeyboard ? "mic" : "edit-2"} size={18} color={colors.mutedForeground} />
               <Text style={[styles.keyboardToggleText, { color: colors.mutedForeground }]}>
                 {showKeyboard ? t.tapMic : t.orTypeBelow}
               </Text>
