@@ -195,12 +195,29 @@ export default function HomeScreen() {
 
   const handleSingPass = async () => {
     if (Platform.OS !== "web") await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    Linking.openURL("singpass://").catch(() => Linking.openURL("https://app.singpass.sg").catch(() => {}));
+    if (Platform.OS === "android") {
+      Linking.openURL("intent://sg.ndi.sp/#Intent;scheme=singpass;package=sg.ndi.sp;end")
+        .catch(() => Linking.openURL("https://app.singpass.sg").catch(() => {}));
+    } else {
+      Linking.openURL("singpass://").catch(() => Linking.openURL("https://app.singpass.sg").catch(() => {}));
+    }
   };
 
   const handleMaps = async () => {
     if (Platform.OS !== "web") await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    Linking.openURL("https://maps.google.com").catch(() => {});
+    Linking.openURL("comgooglemaps://").catch(() =>
+      Linking.openURL("https://maps.google.com").catch(() => {})
+    );
+  };
+
+  const handleAlarm = async () => {
+    if (Platform.OS !== "web") await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    if (Platform.OS === "android") {
+      Linking.openURL("intent://alarm/#Intent;scheme=android-app;end")
+        .catch(() => Linking.openURL("intent:#Intent;action=android.intent.action.SET_ALARM;end").catch(() => {}));
+    } else if (Platform.OS === "ios") {
+      Linking.openURL("clock-alarm://").catch(() => Linking.openURL("com.apple.mobiletimer-display://").catch(() => {}));
+    }
   };
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
@@ -321,11 +338,12 @@ export default function HomeScreen() {
             <ActionCard icon="phone" label={t.family} onPress={handleCallFamily} bg="#1B6CA8" iconColor="#fff" />
             <ActionCard icon="message-square" label={t.whatsapp} onPress={handleWhatsApp} bg="#25D366" iconColor="#fff" />
             <ActionCard icon="youtube" label={t.youtube} onPress={handleYouTube} bg="#FF0000" iconColor="#fff" />
-            <ActionCard icon="map-pin" label="Maps" onPress={handleMaps} bg="#34A853" iconColor="#fff" />
+            <ActionCard icon="map-pin" label={t.maps} onPress={handleMaps} bg="#34A853" iconColor="#fff" />
             <ActionCard icon="calendar" label={t.myAppointment} onPress={handleCalendar} bg="#8B5CF6" iconColor="#fff" />
             <ActionCard icon="shield" label={t.singpass} onPress={handleSingPass} bg="#E07B2A" iconColor="#fff" />
-            <ActionCard icon="bell" label="Reminders" onPress={() => router.push("/reminders")} bg="#0EA5E9" iconColor="#fff" />
-            <ActionCard icon="monitor" label="Caregiver" onPress={() => router.push("/caregiver")} bg="#475569" iconColor="#fff" />
+            <ActionCard icon="bell" label={t.reminders} onPress={() => router.push("/reminders")} bg="#0EA5E9" iconColor="#fff" />
+            <ActionCard icon="clock" label={t.alarm} onPress={handleAlarm} bg="#F59E0B" iconColor="#fff" />
+            <ActionCard icon="monitor" label={t.caregiver} onPress={() => router.push("/caregiver")} bg="#475569" iconColor="#fff" />
           </View>
         </View>
       </ScrollView>

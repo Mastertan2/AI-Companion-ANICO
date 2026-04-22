@@ -1,0 +1,182 @@
+Fix cross-platform issues (Android & iOS) and add new system-level features for the AI Companion app.
+
+Maintain current stack (React + Tailwind + backend API), but improve reliability and add missing functionality.
+
+-----------------------------------
+1. CHECK-IN ALERT NOT WORKING (CRITICAL FIX)
+-----------------------------------
+
+Issue:
+- Check-in works on web simulation
+- But does NOT trigger on Android/iOS devices
+
+Fix:
+
+A. Use browser Notifications API:
+- Request permission on first load
+- Schedule check-in alerts using setInterval
+
+B. Ensure alerts trigger even if user is inactive:
+- Use:
+  Notification("Are you okay?")
+
+C. Add fallback:
+- If notifications blocked → show in-app modal
+
+D. Ensure timing works:
+- Every 3 hours consistently
+
+-----------------------------------
+2. ADD ALARM FEATURE (NEW)
+-----------------------------------
+
+Allow user to create alarms using AI:
+
+User:
+"Set alarm at 7am"
+
+Backend returns:
+{
+  intent: "set_alarm",
+  data: { time: "07:00" }
+}
+
+Frontend:
+
+- Attempt to open device clock app:
+
+Android:
+window.location.href = "intent://alarm/#Intent;scheme=android-app;end";
+
+Fallback:
+- Show instruction:
+"Please set alarm for 7am"
+
+-----------------------------------
+3. REMINDER WITH DATE SUPPORT
+-----------------------------------
+
+Upgrade reminders:
+
+User:
+"Remind me to take medicine tomorrow at 8pm"
+
+Backend returns:
+{
+  intent: "set_reminder",
+  data: {
+    task: "take medicine",
+    date: "YYYY-MM-DD",
+    time: "20:00"
+  }
+}
+
+Frontend:
+- Store full datetime
+- Display properly
+
+-----------------------------------
+4. ANDROID SINGPASS FIX
+-----------------------------------
+
+Issue:
+- Opens website instead of app
+
+Fix:
+
+Try:
+window.location.href = "intent://#Intent;package=sg.ndi.sp;end";
+
+Fallback:
+- Open website
+
+Add message:
+"Opening Singpass for you"
+
+-----------------------------------
+5. ICON / GRAPHIC FIX (ANDROID)
+-----------------------------------
+
+Issue:
+- Icons missing on Android
+
+Fix:
+
+- Replace all icons with:
+  - emojis OR
+  - react-icons library
+
+Ensure:
+- Works on all devices
+- No missing visuals
+
+-----------------------------------
+6. APP ACTION TRANSLATION (MULTI-LANGUAGE)
+-----------------------------------
+
+Translate function labels based on selected language:
+
+Translate:
+- WhatsApp
+- Maps
+- Call
+- Messages
+- Reminders
+- Alarm
+
+DO NOT translate:
+- Singpass (keep original name)
+
+Example:
+
+Chinese:
+- WhatsApp → WhatsApp
+- Maps → 地图
+- Call → 拨打电话
+
+Malay:
+- Maps → Peta
+
+Tamil:
+- Maps → வரைபடம்
+
+-----------------------------------
+7. ACTION RELIABILITY (IMPORTANT)
+-----------------------------------
+
+Ensure all actions:
+
+- Trigger immediately (no extra button)
+- Show feedback:
+  "Opening Maps"
+  "Calling your son"
+
+- Speak response aloud
+
+-----------------------------------
+8. ANDROID COMPATIBILITY
+-----------------------------------
+
+Fix all navigation issues:
+
+- Ensure links open correctly in Android Chrome
+- Add fallback if deep link fails
+
+-----------------------------------
+9. USER EXPERIENCE
+-----------------------------------
+
+- Increase font size
+- Improve readability
+- Keep interface simple
+
+-----------------------------------
+GOAL
+-----------------------------------
+
+Ensure the app:
+- Works consistently on Android and iOS
+- Has reliable check-in alerts
+- Supports alarms and reminders with dates
+- Displays correctly with proper icons
+- Supports multi-language UI

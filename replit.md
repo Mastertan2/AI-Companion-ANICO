@@ -31,7 +31,8 @@ Designed for elderly users. Available in 4 languages: English, Chinese, Malay, T
 - **Check-In Card** (prominent, color-coded): shows last check-in time, status badge (green/yellow/red), "Check In Now" button, "Alert Children" WhatsApp button (appears when overdue/warning)
 - Language selector (EN / 中文 / BM / தமிழ்)
 - Large "Ask a Question" button → AI chat screen
-- Quick actions grid: Call Family, WhatsApp, Calendar, YouTube, SingPass, Reminders, Caregiver
+- Quick actions grid: Call Family, WhatsApp, Calendar, YouTube, SingPass, Maps, Reminders, Alarm, Caregiver — all labels translated per active language
+- Alarm card opens device Clock app via Android intent / iOS clock-alarm scheme
 - Emergency "Call 999" button fixed at bottom
 - Contacts and Settings buttons (top-right)
 
@@ -41,7 +42,8 @@ Designed for elderly users. Available in 4 languages: English, Chinese, Malay, T
 - Voice input: tap mic → record audio → auto-transcribed via `/api/transcribe` (OpenAI Whisper) → sent as chat message
 - Text-to-speech: AI responses read aloud via expo-speech
 - Language-aware TTS voice selection
-- Supports AI action routing for maps, YouTube, Spotify, Google search, calling/messaging contacts by name or role, and creating reminders
+- Supports AI action routing for maps (navigate_maps / open_maps), YouTube, Spotify, Google search, calling/messaging contacts by name or role, creating reminders (with optional date), and setting alarms (set_alarm action opens device Clock app)
+- Android SingPass: uses intent URL `intent://sg.ndi.sp/#Intent;scheme=singpass;package=sg.ndi.sp;end` with web fallback
 
 ### Contacts & Roles Screen (app/contacts.tsx)
 - Reads device contacts via expo-contacts permission

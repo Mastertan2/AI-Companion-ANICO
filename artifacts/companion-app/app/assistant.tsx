@@ -40,8 +40,10 @@ interface ActionResult {
   url?: string;
   time?: string;
   task?: string;
+  date?: string;
   action?: string;
   message?: string;
+  label?: string;
 }
 
 function makeId(): string {
@@ -332,8 +334,21 @@ export default function AssistantScreen() {
     }
 
     if (type === "set_reminder" && action.time && action.task) {
-      await addReminder({ time: action.time, task: action.task });
+      await addReminder({ time: action.time, task: action.task, date: action.date });
       router.push("/reminders");
+      return;
+    }
+
+    if (type === "set_alarm" && action.time) {
+      if (Platform.OS !== "web") await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      if (Platform.OS === "android") {
+        // Android — open system clock/alarm picker via intent
+        Linking.openURL("intent://alarm/#Intent;scheme=android-app;end")
+          .catch(() => Linking.openURL("intent:#Intent;action=android.intent.action.SET_ALARM;end")
+          .catch(() => Linking.openURL("https://play.google.com/store/apps/details?id=com.google.android.deskclock").catch(() => {})));
+      } else if (Platform.OS === "ios") {
+        Linking.openURL("clock-alarm://").catch(() => Linking.openURL("com.apple.mobiletimer-display://").catch(() => {}));
+      }
       return;
     }
 
@@ -354,10 +369,15 @@ export default function AssistantScreen() {
     if (type === "open_app") {
       switch (action.app) {
         case "singpass":
-          // Try app first, fallback to web
-          Linking.openURL("singpass://").catch(() =>
-            Linking.openURL("https://app.singpass.sg").catch(() => {})
-          );
+          // Android uses intent URL; iOS uses scheme; web fallback
+          if (Platform.OS === "android") {
+            Linking.openURL("intent://sg.ndi.sp/#Intent;scheme=singpass;package=sg.ndi.sp;end")
+              .catch(() => Linking.openURL("https://app.singpass.sg").catch(() => {}));
+          } else {
+            Linking.openURL("singpass://").catch(() =>
+              Linking.openURL("https://app.singpass.sg").catch(() => {})
+            );
+          }
           break;
         case "whatsapp":
           Linking.openURL("whatsapp://").catch(() => Linking.openURL("https://www.whatsapp.com").catch(() => {}));
@@ -475,7 +495,7 @@ export default function AssistantScreen() {
           history,
           language,
           contacts: emergencyContacts.map((c) => ({ name: c.name, phone: c.phone, role: c.role })),
-          reminders: reminders.slice(0, 20).map((r) => ({ task: r.task, time: r.time, completedAt: r.completedAt })),
+          reminders: reminders.slice(0, 20).map((r) => ({ task: r.task, time: r.time, date: r.date, completedAt: r.completedAt })),
         }),
       });
 

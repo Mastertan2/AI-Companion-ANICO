@@ -29,6 +29,7 @@ export interface Reminder {
   id: string;
   task: string;
   time: string;
+  date?: string;        // YYYY-MM-DD, optional — if absent means "daily"
   createdAt: string;
   completedAt?: string;
 }
@@ -163,8 +164,9 @@ async function scheduleCheckInNotification(lang: Language, delayMs: number) {
         title: titles[lang] ?? titles.en,
         body: bodies[lang] ?? bodies.en,
         sound: true,
+        ...(Platform.OS === "android" ? { channelId: "checkin" } : {}),
       },
-      trigger: { type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: Math.max(1, Math.floor(delayMs / 1000)) },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: Math.max(60, Math.floor(delayMs / 1000)) },
     });
   } catch {}
 }

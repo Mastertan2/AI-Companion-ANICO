@@ -24,6 +24,21 @@ function timeContext(time24: string): string {
   return "Night";
 }
 
+function formatDateLabel(dateStr: string | undefined): string {
+  if (!dateStr) return "Daily";
+  try {
+    const d = new Date(dateStr + "T00:00:00");
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1);
+    const target = new Date(dateStr + "T00:00:00"); target.setHours(0, 0, 0, 0);
+    const diff = Math.round((target.getTime() - today.getTime()) / 86400000);
+    if (diff === 0) return "Today";
+    if (diff === 1) return "Tomorrow";
+    if (diff === -1) return "Yesterday";
+    return d.toLocaleDateString("en-SG", { day: "numeric", month: "short", year: "numeric" });
+  } catch { return dateStr; }
+}
+
 export default function RemindersScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -31,15 +46,18 @@ export default function RemindersScreen() {
   const { reminders, addReminder, removeReminder, completeReminder } = useApp();
   const [task, setTask] = useState("");
   const [time, setTime] = useState("");
+  const [date, setDate] = useState("");
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
 
   const save = async () => {
     if (!task.trim() || !/^\d{1,2}:\d{2}$/.test(time.trim())) return;
     const [h, m] = time.split(":");
-    await addReminder({ task: task.trim(), time: `${h.padStart(2, "0")}:${m}` });
+    const parsedDate = /^\d{4}-\d{2}-\d{2}$/.test(date.trim()) ? date.trim() : undefined;
+    await addReminder({ task: task.trim(), time: `${h.padStart(2, "0")}:${m}`, date: parsedDate });
     setTask("");
     setTime("");
+    setDate("");
   };
 
   const renderReminder = ({ item }: { item: Reminder }) => (
@@ -50,6 +68,9 @@ export default function RemindersScreen() {
         </Text>
         <Text style={[styles.timePeriod, { color: item.completedAt ? colors.mutedForeground : "rgba(255,255,255,0.8)" }]}>
           {timeContext(item.time)}
+        </Text>
+        <Text style={[styles.timePeriod, { color: item.completedAt ? colors.mutedForeground : "rgba(255,255,255,0.75)", marginTop: 2 }]}>
+          {formatDateLabel(item.date)}
         </Text>
       </View>
       <View style={styles.flex1}>
@@ -101,6 +122,14 @@ export default function RemindersScreen() {
           value={time}
           onChangeText={setTime}
           placeholder="Time (e.g. 20:00 for 8:00 PM)"
+          placeholderTextColor={colors.mutedForeground}
+          keyboardType="numbers-and-punctuation"
+        />
+        <TextInput
+          style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderRadius: 14 }]}
+          value={date}
+          onChangeText={setDate}
+          placeholder="Date (YYYY-MM-DD, optional)"
           placeholderTextColor={colors.mutedForeground}
           keyboardType="numbers-and-punctuation"
         />

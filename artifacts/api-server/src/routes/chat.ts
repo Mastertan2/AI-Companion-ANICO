@@ -18,9 +18,20 @@ function getTimeOfDay(): "morning" | "afternoon" | "evening" | "night" {
   return "night";
 }
 
+function getTodayDateStr(): string {
+  const d = new Date();
+  return d.toISOString().split("T")[0];
+}
+
+function getTomorrowDateStr(): string {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  return d.toISOString().split("T")[0];
+}
+
 function buildSystemPrompt(
   contacts: Array<{ name: string; phone: string; role?: string }>,
-  reminders: Array<{ task: string; time: string; completedAt?: string }>,
+  reminders: Array<{ task: string; time: string; date?: string; completedAt?: string }>,
   lang: string,
   timeOfDay: string
 ): string {
@@ -29,20 +40,25 @@ function buildSystemPrompt(
     : "(no contacts saved)";
 
   const reminderList = reminders.length > 0
-    ? reminders.map((r) => `- ${r.task} at ${r.time}${r.completedAt ? " [done]" : ""}`).join("\n")
+    ? reminders.map((r) => `- ${r.task} at ${r.time}${r.date ? ` on ${r.date}` : ""}${r.completedAt ? " [done]" : ""}`).join("\n")
     : "(no reminders)";
 
   const langInstruction =
     lang === "zh" ? "You MUST reply in Simplified Chinese only. Never switch to English, Malay, or Tamil." :
     lang === "ms" ? "You MUST reply in Malay (Bahasa Melayu) only. Never switch to English, Chinese, or Tamil." :
-    lang === "ta" ? "You MUST reply in Tamil (தமிழ்) only. Never switch to English, Chinese, or Malay. Do NOT use question marks (?) in your reply — use native Tamil sentence endings instead." :
+    lang === "ta" ? "You MUST reply in Tamil (தமிழ்) only. Never switch to English, Chinese, or Malay. CRITICAL: Do NOT use question marks (?) anywhere in your reply — end questions with a comma or just omit the mark entirely." :
     "You MUST reply in English only. Never switch to Chinese, Malay, or Tamil.";
+
+  const todayStr = getTodayDateStr();
+  const tomorrowStr = getTomorrowDateStr();
 
   return `You are a warm, patient AI companion for elderly users. Always use simple, short, clear sentences.
 
 LANGUAGE RULE: ${langInstruction}
 
 Current time of day: ${timeOfDay}
+Today's date: ${todayStr}
+Tomorrow's date: ${tomorrowStr}
 
 You MUST ALWAYS respond with valid JSON in EXACTLY this shape:
 {"reply":"...","action":null}
@@ -54,17 +70,17 @@ CRITICAL: The reply field must be a plain string. Never put JSON inside the repl
 
 Supported actions:
 
-1. Navigate (directions):
+1. Navigate (directions mode — auto-open turn-by-turn):
 {"type":"navigate_maps","query":"destination name"}
-Use for: "go to", "take me to", "directions to", "navigate to", "how do I get to".
+Use for: "go to", "take me to", "directions to", "navigate to".
 
-2. Search maps (no directions needed):
+2. Search maps (no directions):
 {"type":"open_maps","query":"place name"}
 Use for: "find nearby", "where is".
 
 3. YouTube:
 {"type":"open_youtube","query":"search term"}
-Use for: "play", "watch", "YouTube", "show me".
+Use for: "play", "watch", "YouTube".
 
 4. Spotify:
 {"type":"open_spotify","query":"song or artist"}
@@ -75,35 +91,38 @@ Use for: "Spotify", "play music on Spotify".
 Use for: "find", "search", "look up".
 
 6. Open app:
-{"type":"open_app","app":"singpass"} | "whatsapp" | "youtube" | "googlemaps" | "calendar" | "healthhub" | "camera"
+{"type":"open_app","app":"singpass"} | "whatsapp" | "youtube" | "googlemaps" | "calendar" | "healthhub" | "camera" | "clock"
 
-7. Call contact (IMMEDIATELY, no confirmation needed):
+7. Call contact (triggers immediately):
 {"type":"call_contact","name":"contact name or role"}
-Use for: "call my [role/name]", "ring [name]", "phone [name]".
-Match by name, role, or relationship word (son/daughter/child/doctor/friend).
 
-8. WhatsApp with message:
-{"type":"whatsapp_message","name":"contact name or role","message":"crafted message text"}
-Use for: "text", "message", "WhatsApp", "send a message".
-Craft a natural, polite message from what the user says.
+8. WhatsApp with pre-filled message:
+{"type":"whatsapp_message","name":"contact name or role","message":"crafted message"}
+Use when a specific message is given.
 
-9. WhatsApp open (no specific contact):
+9. WhatsApp open (no specific message):
 {"type":"whatsapp_contact","name":"contact name or role"}
-Use when messaging but no specific message content given.
 
 10. Emergency:
 {"type":"call_emergency"}
 Use for: emergency, ambulance, police, call 999.
 
-11. Set reminder:
-{"type":"set_reminder","time":"HH:MM","task":"task text"}
-Convert to 24h HH:MM. If time is unclear, action null and ask.
+11. Set reminder WITH optional date:
+{"type":"set_reminder","time":"HH:MM","task":"task text","date":"YYYY-MM-DD"}
+- Convert time to 24h HH:MM format.
+- "today" → use ${todayStr}
+- "tomorrow" → use ${tomorrowStr}
+- If no date mentioned, omit the date field.
+- If time unclear, ask for it.
 
-12. Update reminder (mark done or cancel):
+12. Update reminder (done/cancel by voice):
 {"type":"update_reminder","action":"mark_done","task":"task name"}
 {"type":"update_reminder","action":"cancel","task":"task name"}
-Use for: "mark my medicine as done", "cancel my 8pm reminder", "I already took my medicine".
-Match the task name to the closest reminder in the list.
+
+13. Set alarm:
+{"type":"set_alarm","time":"HH:MM","label":"alarm label"}
+Use for: "set alarm", "wake me up", "alarm for 7am".
+Convert to 24h HH:MM. Reply with a confirmation like "I will try to open the clock app for you to set the alarm."
 
 Saved contacts:
 ${contactList}
@@ -112,13 +131,13 @@ Saved reminders:
 ${reminderList}
 
 Rules:
-- For "call my son" → immediately return call_contact action, reply "Calling your son now."
-- For "text/message/WhatsApp my son I need to meet for lunch" → return whatsapp_message with crafted message.
-- For "go to Bugis" → return navigate_maps (directions mode).
-- For "find a clinic near me" → return open_maps (search mode).
-- If multiple contacts match, pick the best one. If truly ambiguous, ask.
-- Never add question marks (?) if language is Tamil (ta).
-- Always confirm the action in the reply: "Calling John now", "Opening maps to Bugis", "Sending message to your son".`;
+- For "call my son" → call_contact, reply "Calling your son now."
+- For "text/WhatsApp my son I need lunch tomorrow" → whatsapp_message with crafted polite message.
+- For "go to Bugis" → navigate_maps.
+- For "find a clinic" → open_maps.
+- For "set alarm at 7am" → set_alarm, reply with confirmation.
+- Always confirm the action in the reply: "Calling John now", "Opening maps to Bugis", "Setting reminder for 8 PM tomorrow".
+- Do NOT add question marks (?) if language is Tamil.`;
 }
 
 router.get("/", (_req, res): void => {
@@ -131,7 +150,7 @@ router.post("/chat", async (req, res): Promise<void> => {
     history?: Array<{ role: string; content: string }>;
     language?: string;
     contacts?: Array<{ name: string; phone: string; role?: string }>;
-    reminders?: Array<{ task: string; time: string; completedAt?: string }>;
+    reminders?: Array<{ task: string; time: string; date?: string; completedAt?: string }>;
   };
 
   if (!message || typeof message !== "string") {
@@ -156,19 +175,14 @@ router.post("/chat", async (req, res): Promise<void> => {
         { role: "user", content: message },
       ],
       response_format: { type: "json_object" },
-      temperature: 0.4,
+      temperature: 0.35,
     });
 
     const raw = completion.choices[0]?.message?.content ?? '{"reply":"I am here to help!","action":null}';
     let parsed: { reply: string; action: unknown } = { reply: "", action: null };
-    try {
-      parsed = JSON.parse(raw);
-    } catch {
-      parsed = { reply: raw, action: null };
-    }
+    try { parsed = JSON.parse(raw); } catch { parsed = { reply: raw, action: null }; }
 
     const reply = typeof parsed.reply === "string" ? parsed.reply : raw;
-    // Strip question marks for Tamil TTS
     const cleanReply = lang === "ta" ? reply.replace(/\?/g, "") : reply;
     const action = parsed.action && typeof parsed.action === "object" ? parsed.action : null;
 

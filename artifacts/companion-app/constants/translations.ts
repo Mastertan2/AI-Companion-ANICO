@@ -64,6 +64,19 @@ export interface Translations {
   cancel: string;
   confirmRemove: string;
   orTypeBelow: string;
+  // Action labels (translated)
+  maps: string;
+  callAction: string;
+  reminders: string;
+  alarm: string;
+  caregiver: string;
+  // Verbal action feedback
+  openingMaps: string;
+  callingNow: string;
+  openingWhatsApp: string;
+  openingSingPass: string;
+  openingYouTube: string;
+  alarmInstruction: string;
 }
 
 export const translations: Record<Language, Translations> = {
@@ -131,6 +144,17 @@ export const translations: Record<Language, Translations> = {
     cancel: "Cancel",
     confirmRemove: "Remove this contact?",
     orTypeBelow: "or type below",
+    maps: "Maps",
+    callAction: "Call",
+    reminders: "Reminders",
+    alarm: "Alarm",
+    caregiver: "Caregiver",
+    openingMaps: "Opening Maps...",
+    callingNow: "Calling now...",
+    openingWhatsApp: "Opening WhatsApp...",
+    openingSingPass: "Opening SingPass...",
+    openingYouTube: "Opening YouTube...",
+    alarmInstruction: "Please set your alarm in the Clock app.",
   },
   zh: {
     greetingMorning: "早上好",
@@ -196,6 +220,17 @@ export const translations: Record<Language, Translations> = {
     cancel: "取消",
     confirmRemove: "删除此联系人？",
     orTypeBelow: "或在下方输入",
+    maps: "地图",
+    callAction: "拨打电话",
+    reminders: "提醒",
+    alarm: "闹钟",
+    caregiver: "照顾者",
+    openingMaps: "正在打开地图...",
+    callingNow: "正在拨打...",
+    openingWhatsApp: "正在打开WhatsApp...",
+    openingSingPass: "正在打开SingPass...",
+    openingYouTube: "正在打开YouTube...",
+    alarmInstruction: "请在时钟应用中设置闹钟。",
   },
   ms: {
     greetingMorning: "Selamat pagi",
@@ -261,6 +296,17 @@ export const translations: Record<Language, Translations> = {
     cancel: "Batal",
     confirmRemove: "Padam kenalan ini?",
     orTypeBelow: "atau taip di bawah",
+    maps: "Peta",
+    callAction: "Hubungi",
+    reminders: "Peringatan",
+    alarm: "Penggera",
+    caregiver: "Penjaga",
+    openingMaps: "Membuka peta...",
+    callingNow: "Memanggil sekarang...",
+    openingWhatsApp: "Membuka WhatsApp...",
+    openingSingPass: "Membuka SingPass...",
+    openingYouTube: "Membuka YouTube...",
+    alarmInstruction: "Sila tetapkan penggera dalam aplikasi Jam.",
   },
   ta: {
     greetingMorning: "காலை வணக்கம்",
@@ -275,14 +321,14 @@ export const translations: Record<Language, Translations> = {
     youtube: "YouTube",
     singpass: "SingPass",
     emergency: "அவசரம்",
-    howCanIHelp: "நான் எப்படி உதவலாம்?",
+    howCanIHelp: "நான் எப்படி உதவலாம்",
     typeMessage: "உங்கள் செய்தியை தட்டச்சு செய்க...",
     send: "அனுப்பு",
     listening: "கேட்கிறது...",
     speaking: "பேசுகிறது...",
     back: "திரும்பு",
-    areYouOkay: "நீங்கள் நலமா?",
-    yesFine: "ஆம், நான் நலம்!",
+    areYouOkay: "நீங்கள் நலமா",
+    yesFine: "ஆம், நான் நலம்",
     needHelp: "எனக்கு உதவி தேவை",
     alertingFamily: "உங்கள் குடும்பத்தினருக்கு தெரிவிக்கிறது...",
     openingApp: "செயலி திறக்கிறது...",
@@ -300,17 +346,17 @@ export const translations: Record<Language, Translations> = {
     openSettings: "அமைப்புகள் திற",
     checkIn: "சரிபார்ப்பு",
     checkInTitle: "3 மணி நேர சரிபார்ப்பு",
-    checkInPrompt: "வணக்கம்! கடந்த 3 மணி நேரமாக நீங்கள் சரிபார்க்கவில்லை. நலமாக இருக்கிறீர்களா?",
-    checkInFine: "ஆம், நலம்!",
+    checkInPrompt: "வணக்கம். கடந்த 3 மணி நேரமாக நீங்கள் சரிபார்க்கவில்லை. நலமாக இருக்கிறீர்களா",
+    checkInFine: "ஆம், நலம்",
     checkInHelp: "எனக்கு உதவி தேவை",
     checkInAlertSent: "உங்கள் குடும்பத்தினருக்கு தெரிவிக்கப்பட்டது. உதவி வழியில் உள்ளது.",
     lastCheckIn: "கடைசி சரிபார்ப்பு",
     checkInNow: "இப்போது சரிபார் ✓",
     alertChildren: "குழந்தைகளை எச்சரி",
-    alertMessage: "வணக்கம்! AI Companion ஆப்பிலிருந்து எச்சரிக்கை. உங்கள் அன்பானவர் 3 மணி நேரமாக சரிபார்க்கவில்லை. தயவுசெய்து சோதிக்கவும்.",
+    alertMessage: "வணக்கம். AI Companion ஆப்பிலிருந்து எச்சரிக்கை. உங்கள் அன்பானவர் 3 மணி நேரமாக சரிபார்க்கவில்லை. தயவுசெய்து சோதிக்கவும்.",
     checkInStatusGood: "நலம்",
     checkInStatusWarning: "விரைவில் சரிபார்க்கவும்",
-    checkInStatusDue: "காலதாமதம்!",
+    checkInStatusDue: "காலதாமதம்",
     checkInNever: "இன்று இன்னும் இல்லை",
     minutesAgo: "நிமிடங்கள் முன்",
     hourAgo: "மணி முன்",
@@ -324,7 +370,18 @@ export const translations: Record<Language, Translations> = {
     speakResponse: "சத்தமாக படி",
     stopSpeaking: "நிறுத்து",
     cancel: "ரத்து",
-    confirmRemove: "இந்த தொடர்பை நீக்கவா?",
+    confirmRemove: "இந்த தொடர்பை நீக்கவா",
     orTypeBelow: "அல்லது கீழே தட்டச்சு செய்க",
+    maps: "வரைபடம்",
+    callAction: "அழை",
+    reminders: "நினைவூட்டல்கள்",
+    alarm: "அலாரம்",
+    caregiver: "பராமரிப்பாளர்",
+    openingMaps: "வரைபடம் திறக்கிறது...",
+    callingNow: "இப்போது அழைக்கிறது...",
+    openingWhatsApp: "WhatsApp திறக்கிறது...",
+    openingSingPass: "SingPass திறக்கிறது...",
+    openingYouTube: "YouTube திறக்கிறது...",
+    alarmInstruction: "கடிகார பயன்பாட்டில் அலாரம் அமைக்கவும்.",
   },
 };
