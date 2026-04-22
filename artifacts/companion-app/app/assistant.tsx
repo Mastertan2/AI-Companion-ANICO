@@ -585,22 +585,35 @@ export default function AssistantScreen() {
   }, []);
 
   /* ─── NATIVE MIC ─── */
-  const stopNativeMicAuto = useCallback(async () => {
-    if (isStoppingRef.current) return;
-    isStoppingRef.current = true;
+
+  /** Core stop logic – always runs regardless of guard flag. */
+  const doStopNativeRecording = useCallback(async (submitAudio: boolean) => {
     if (maxTimerRef.current) { clearTimeout(maxTimerRef.current); maxTimerRef.current = null; }
     setIsRecording(false);
     setVadLevel(0);
-    if (!recordingRef.current) return;
+
+    const rec = recordingRef.current;
+    if (!rec) return;
+    recordingRef.current = null;
+
+    if (!submitAudio) {
+      // Cancelled by user — just stop and discard
+      try {
+        const { Audio } = await import("expo-av");
+        const recording = rec as InstanceType<typeof Audio.Recording>;
+        await recording.stopAndUnloadAsync().catch(() => {});
+        await Audio.setAudioModeAsync({ allowsRecordingIOS: false }).catch(() => {});
+      } catch {}
+      return;
+    }
 
     setIsTranscribing(true);
     try {
       const { Audio } = await import("expo-av");
-      const recording = recordingRef.current as InstanceType<typeof Audio.Recording>;
+      const recording = rec as InstanceType<typeof Audio.Recording>;
       await recording.stopAndUnloadAsync();
       await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
       const uri = recording.getURI();
-      recordingRef.current = null;
 
       if (!hasSpokenRef.current) { setNoSpeechDetected(true); return; }
 
@@ -623,6 +636,19 @@ export default function AssistantScreen() {
       setIsTranscribing(false);
     }
   }, [language, normalizeAndSend]);
+
+  /** VAD / timer auto-stop — guarded so it only fires once. */
+  const stopNativeMicAuto = useCallback(async () => {
+    if (isStoppingRef.current) return;
+    isStoppingRef.current = true;
+    await doStopNativeRecording(true);
+  }, [doStopNativeRecording]);
+
+  /** Manual stop from button press — always fires, regardless of guard. */
+  const forceStopNativeMic = useCallback(async () => {
+    isStoppingRef.current = true;
+    await doStopNativeRecording(hasSpokenRef.current);
+  }, [doStopNativeRecording]);
 
   const startNativeMic = async () => {
     try {
@@ -671,10 +697,7 @@ export default function AssistantScreen() {
   const handleMicPress = () => {
     if (isRecording) {
       if (Platform.OS === "web") stopWebMic();
-      else {
-        isStoppingRef.current = true;
-        stopNativeMicAuto();
-      }
+      else forceStopNativeMic().catch(() => {}); // uses the guard-free path so button always works
     } else {
       if (Platform.OS === "web") startWebMic().catch(() => {});
       else startNativeMic().catch(() => {});
