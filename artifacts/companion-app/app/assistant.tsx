@@ -149,7 +149,7 @@ export default function AssistantScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { language, isSpeechEnabled, emergencyContacts, recordActivity, addReminder, sealionApiKey } = useApp();
+  const { language, isSpeechEnabled, emergencyContacts, recordActivity, addReminder } = useApp();
   const t = translations[language];
 
   const [messages, setMessages] = useState<Message[]>([]);
@@ -478,21 +478,16 @@ export default function AssistantScreen() {
       const trimmed = rawTranscript.trim();
       if (!trimmed) return;
 
-      if (!sealionApiKey) {
-        await sendMessage(trimmed, undefined);
-        return;
-      }
-
       setIsNormalizing(true);
       try {
-        const result = await normalizeSpeech(trimmed, sealionApiKey);
+        const result = await normalizeSpeech(trimmed);
         const original = result.changed ? trimmed : undefined;
         await sendMessage(result.normalized, original);
       } finally {
         setIsNormalizing(false);
       }
     },
-    [sealionApiKey, sendMessage]
+    [sendMessage]
   );
 
   /* ─── WEB MIC (SpeechRecognition + AudioContext VAD) ─── */
