@@ -5,6 +5,7 @@ import { AppState, Platform } from "react-native";
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 
 import { type Language } from "@/constants/translations";
+import { WELLBEING_PROMPTS, WELLBEING_SLOTS, type WellbeingPromptType } from "@/constants/wellbeingPrompts";
 
 export type ContactRole = "child" | "friend" | "doctor";
 export type PrivacyKey = "location" | "checkInStatus" | "emergencyAlerts" | "appActivity" | "reminders";
@@ -68,6 +69,10 @@ interface AppContextValue {
   recentAlerts: CareAlert[];
   userName: string;
   setUserName: (name: string) => void;
+  // Wellbeing prompts
+  pendingWellbeingPrompt: string | null;
+  receiveWellbeingPrompt: (promptType: string, lang: Language) => void;
+  consumeWellbeingPrompt: () => string | null;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -184,6 +189,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [isSpeechEnabled, setIsSpeechEnabled] = useState(true);
   const [inactivityMinutesLeft, setInactivityMinutesLeft] = useState<number | null>(null);
   const [careStatus, setCareStatus] = useState<CareStatus>("ok");
+
+  const [pendingWellbeingPrompt, setPendingWellbeingPromptState] = useState<string | null>(null);
+  const pendingWellbeingRef = useRef<string | null>(null);
 
   const checkInTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoAlertTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -393,9 +401,63 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           importance: Notifications.AndroidImportance.HIGH,
           vibrationPattern: [0, 250, 250, 250],
         });
+        await Notifications.setNotificationChannelAsync("wellbeing", {
+          name: "Daily Wellbeing",
+          importance: Notifications.AndroidImportance.DEFAULT,
+          sound: "default",
+        });
       }
+      // Schedule daily wellbeing notifications
+      await scheduleWellbeingNotifications(languageRef.current);
     } catch {}
   };
+
+  /** Schedule (or re-schedule) all 6 daily wellbeing notifications. */
+  async function scheduleWellbeingNotifications(lang: Language) {
+    if (Platform.OS === "web") return;
+    try {
+      // Cancel any previously scheduled wellbeing notifications
+      const scheduled = await Notifications.getAllScheduledNotificationsAsync().catch(() => [] as Notifications.NotificationRequest[]);
+      for (const n of scheduled) {
+        if (n.content.data?.wellbeing) {
+          await Notifications.cancelScheduledNotificationAsync(n.identifier).catch(() => {});
+        }
+      }
+      for (const slot of WELLBEING_SLOTS) {
+        const text = WELLBEING_PROMPTS[slot.type][lang];
+        await Notifications.scheduleNotificationAsync({
+          identifier: slot.id,
+          content: {
+            title: text.notifTitle,
+            body: text.notifBody,
+            sound: true,
+            data: { wellbeing: true, promptType: slot.type, lang },
+            ...(Platform.OS === "android" ? { channelId: "wellbeing" } : {}),
+          },
+          trigger: {
+            type: Notifications.SchedulableTriggerInputTypes.DAILY,
+            hour: slot.hour,
+            minute: slot.minute,
+          },
+        });
+      }
+    } catch {}
+  }
+
+  const receiveWellbeingPrompt = useCallback((promptType: string, lang: Language) => {
+    const prompts = WELLBEING_PROMPTS[promptType as WellbeingPromptType];
+    if (!prompts) return;
+    const text = prompts[lang] ?? prompts.en;
+    pendingWellbeingRef.current = text.chatMessage;
+    setPendingWellbeingPromptState(text.chatMessage);
+  }, []);
+
+  const consumeWellbeingPrompt = useCallback((): string | null => {
+    const val = pendingWellbeingRef.current;
+    pendingWellbeingRef.current = null;
+    setPendingWellbeingPromptState(null);
+    return val;
+  }, []);
 
   async function triggerAutoAlert() {
     const name = userNameRef.current;
@@ -463,6 +525,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setLanguageState(lang);
     languageRef.current = lang;
     await AsyncStorage.setItem(STORAGE_KEYS.language, lang).catch(() => {});
+    // Re-schedule wellbeing notifications in the new language
+    if (Platform.OS !== "web") scheduleWellbeingNotifications(lang);
   }, []);
 
   const addEmergencyContact = useCallback(async (contact: EmergencyContact) => {
@@ -589,6 +653,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       privacyPreferences, updatePrivacyPreferences, reminders, addReminder, removeReminder, completeReminder,
       isCheckInDue, checkInQuestion, dismissCheckIn, callForHelp, alertChildren, lastCheckInTime,
       isSpeechEnabled, toggleSpeech, recordActivity, inactivityMinutesLeft, careStatus, recentAlerts, userName, setUserName,
+      pendingWellbeingPrompt, receiveWellbeingPrompt, consumeWellbeingPrompt,
     }}>
       {children}
     </AppContext.Provider>

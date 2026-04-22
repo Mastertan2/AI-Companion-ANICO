@@ -92,41 +92,51 @@ function buildGoogleSearchUrl(query: string): string {
 
 function getTimeOfDayPrompt(lang: string): string | null {
   const h = new Date().getHours();
-  const prompts: Record<string, { morning: string; breakfast: string; lunch: string; dinner: string; checkin: string }> = {
+  const m = new Date().getMinutes();
+  const totalMins = h * 60 + m;
+
+  type PromptSet = { morning: string; breakfast: string; activity1: string; lunch: string; activity2: string; dinner: string };
+  const prompts: Record<string, PromptSet> = {
     en: {
-      morning: "Good morning ☀️ How are you feeling today?",
-      breakfast: "Good morning! Have you had breakfast yet?",
-      lunch: "Good afternoon! Have you eaten lunch? Remember to stay hydrated.",
-      dinner: "Good evening! Have you had dinner yet?",
-      checkin: "Hi there! Just checking in — what have you been up to?",
+      morning:   "Good morning ☀️ How are you feeling today? What would you like to do?",
+      breakfast: "Good morning! Have you had breakfast yet? Remember to eat well today 😊",
+      activity1: "Hi! What have you been doing this morning? Did you go for a walk?",
+      lunch:     "Good afternoon! Have you eaten lunch? Remember to drink plenty of water 💧",
+      activity2: "Good afternoon! How are you doing? Have you had a rest or gone for a walk today?",
+      dinner:    "Good evening! Have you had dinner yet? I hope you had a wonderful day 🌙",
     },
     zh: {
-      morning: "早上好 ☀️ 您今天感觉怎么样？",
-      breakfast: "早上好！您吃早饭了吗？",
-      lunch: "下午好！您吃午饭了吗？记得多喝水。",
-      dinner: "晚上好！您吃晚饭了吗？",
-      checkin: "您好！想问问您今天过得怎么样？",
+      morning:   "早上好 ☀️ 您今天感觉怎么样？今天想做什么？",
+      breakfast: "早上好！您吃早饭了吗？记得好好吃饭哦 😊",
+      activity1: "您好！今天早上您在做什么？有没有出去散步？",
+      lunch:     "下午好！您吃午饭了吗？记得多喝水 💧",
+      activity2: "下午好！您感觉怎么样？今天有没有休息或者散步？",
+      dinner:    "晚上好！您吃晚饭了吗？希望您今天过得愉快 🌙",
     },
     ms: {
-      morning: "Selamat pagi ☀️ Macam mana perasaan anda hari ini?",
-      breakfast: "Selamat pagi! Sudah makan pagi?",
-      lunch: "Selamat tengahari! Sudah makan tengahari? Jangan lupa minum air.",
-      dinner: "Selamat malam! Sudah makan malam?",
-      checkin: "Hai! Sekadar bertanya — apa yang anda buat tadi?",
+      morning:   "Selamat pagi ☀️ Macam mana perasaan anda hari ini? Apa yang anda ingin lakukan?",
+      breakfast: "Selamat pagi! Sudah makan pagi? Ingat untuk makan dengan baik 😊",
+      activity1: "Hai! Apa yang anda buat pagi ini? Adakah anda berjalan-jalan?",
+      lunch:     "Selamat tengahari! Sudah makan tengahari? Jangan lupa minum air 💧",
+      activity2: "Selamat petang! Macam mana anda? Sudah berehat atau berjalan hari ini?",
+      dinner:    "Selamat malam! Sudah makan malam? Semoga hari anda menyenangkan 🌙",
     },
     ta: {
-      morning: "காலை வணக்கம் ☀️ இன்று நீங்கள் எப்படி உணர்கிறீர்கள்",
-      breakfast: "காலை வணக்கம். காலை உணவு சாப்பிட்டீர்களா",
-      lunch: "மதிய வணக்கம். மதிய உணவு சாப்பிட்டீர்களா. தண்ணீர் குடிக்க மறக்காதீர்கள்.",
-      dinner: "மாலை வணக்கம். இரவு உணவு சாப்பிட்டீர்களா",
-      checkin: "வணக்கம். நீங்கள் என்ன செய்கிறீர்கள்",
+      morning:   "காலை வணக்கம் ☀️ இன்று நீங்கள் எப்படி உணர்கிறீர்கள். இன்று என்ன செய்ய விரும்புகிறீர்கள்",
+      breakfast: "காலை வணக்கம். காலை உணவு சாப்பிட்டீர்களா. நன்றாக சாப்பிடுவது முக்கியம் 😊",
+      activity1: "வணக்கம். இன்று காலை நீங்கள் என்ன செய்தீர்கள். சிறிது நடந்தீர்களா",
+      lunch:     "மதிய வணக்கம். மதிய உணவு சாப்பிட்டீர்களா. தண்ணீர் குடிக்க மறக்காதீர்கள் 💧",
+      activity2: "மாலை வணக்கம். நீங்கள் எப்படி உணர்கிறீர்கள். இன்று ஓய்வெடுத்தீர்களா அல்லது நடந்தீர்களா",
+      dinner:    "மாலை வணக்கம். இரவு உணவு சாப்பிட்டீர்களா. நல்ல நாளாக இருந்திருக்கும் 🌙",
     },
   };
   const set = prompts[lang] ?? prompts.en;
-  if (h >= 7 && h < 8) return set.morning;
-  if (h >= 8 && h < 10) return set.breakfast;
-  if (h >= 12 && h < 14) return set.lunch;
-  if (h >= 18 && h < 20) return set.dinner;
+  if (totalMins >= 7*60 && totalMins < 8*60)   return set.morning;
+  if (totalMins >= 8*60 && totalMins < 10*60)  return set.breakfast;
+  if (totalMins >= 10*60 && totalMins < 12*60) return set.activity1;
+  if (totalMins >= 12*60 && totalMins < 14*60) return set.lunch;
+  if (totalMins >= 14*60 && totalMins < 17*60) return set.activity2;
+  if (totalMins >= 17*60 && totalMins < 21*60) return set.dinner;
   return null;
 }
 
@@ -184,7 +194,7 @@ export default function AssistantScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { language, isSpeechEnabled, emergencyContacts, recordActivity, addReminder, completeReminder, removeReminder, reminders } = useApp();
+  const { language, isSpeechEnabled, emergencyContacts, recordActivity, addReminder, completeReminder, removeReminder, reminders, pendingWellbeingPrompt, consumeWellbeingPrompt } = useApp();
   const t = translations[language];
 
   const [messages, setMessages] = useState<Message[]>([]);
@@ -217,18 +227,22 @@ export default function AssistantScreen() {
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
 
-  // Show a time-based wellbeing prompt on first open
+  // Show wellbeing/time-based prompt on first open
   useEffect(() => {
     if (hasShownWelcomeRef.current) return;
     hasShownWelcomeRef.current = true;
-    const prompt = getTimeOfDayPrompt(language);
+
+    // Priority 1: prompt from a tapped notification
+    const fromNotif = consumeWellbeingPrompt();
+    const prompt = fromNotif ?? getTimeOfDayPrompt(language);
+
     if (prompt) {
       const greeting: Message = { id: makeId(), role: "assistant", content: prompt, action: null };
       setMessages([greeting]);
-      // Speak greeting after a short delay so screen has mounted
       setTimeout(() => speakText(prompt), 800);
     }
-  }, [language]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (Platform.OS === "web" && typeof window !== "undefined") {
