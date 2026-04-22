@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Linking from "expo-linking";
 import * as Notifications from "expo-notifications";
-import { Platform } from "react-native";
+import { AppState, Platform } from "react-native";
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 
 import { type Language } from "@/constants/translations";
@@ -86,6 +86,7 @@ const STORAGE_KEYS = {
 
 const CHECK_IN_INTERVAL_MS = 3 * 60 * 60 * 1000;
 const NO_RESPONSE_ALERT_MS = 6 * 60 * 60 * 1000;
+const CHECK_IN_NOTIF_ID = "companion_checkin";
 
 const DEFAULT_PRIVACY: PrivacyPreferences = {
   location: false,
@@ -103,15 +104,17 @@ const CHECK_IN_QUESTIONS: Record<Language, string[]> = {
 };
 
 if (Platform.OS !== "web") {
-  Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowAlert: true,
-      shouldPlaySound: true,
-      shouldSetBadge: false,
-      shouldShowBanner: true,
-      shouldShowList: true,
-    }),
-  });
+  try {
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: false,
+        shouldShowBanner: true,
+        shouldShowList: true,
+      }),
+    });
+  } catch {}
 }
 
 function makeId(): string {
@@ -138,6 +141,34 @@ function normalizeStoredContacts(input: unknown): EmergencyContact[] {
     });
 }
 
+async function scheduleCheckInNotification(lang: Language, delayMs: number) {
+  if (Platform.OS === "web") return;
+  try {
+    await Notifications.cancelScheduledNotificationAsync(CHECK_IN_NOTIF_ID).catch(() => {});
+    const titles: Record<Language, string> = {
+      en: "Time to check in 👋",
+      zh: "打卡时间到了 👋",
+      ms: "Masa untuk daftar masuk 👋",
+      ta: "செக்-இன் நேரம் வந்தது 👋",
+    };
+    const bodies: Record<Language, string> = {
+      en: "How are you feeling? Tap to let your family know you're okay.",
+      zh: "您感觉怎么样？点击告诉家人您一切安好。",
+      ms: "Bagaimana perasaan anda? Ketik untuk memberitahu keluarga anda.",
+      ta: "நீங்கள் எப்படி இருக்கிறீர்கள்? உங்கள் குடும்பத்தினருக்கு தெரியப்படுத்த தட்டவும்.",
+    };
+    await Notifications.scheduleNotificationAsync({
+      identifier: CHECK_IN_NOTIF_ID,
+      content: {
+        title: titles[lang] ?? titles.en,
+        body: bodies[lang] ?? bodies.en,
+        sound: true,
+      },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: Math.max(1, Math.floor(delayMs / 1000)) },
+    });
+  } catch {}
+}
+
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [language, setLanguageState] = useState<Language>("en");
   const [emergencyContacts, setEmergencyContacts] = useState<EmergencyContact[]>([]);
@@ -161,21 +192,75 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const userNameRef = useRef("your loved one");
   const lastCheckInRef = useRef<Date | null>(null);
   const lastActivityRef = useRef(Date.now());
+  const isCheckInDueRef = useRef(false);
 
   useEffect(() => { contactsRef.current = emergencyContacts; }, [emergencyContacts]);
   useEffect(() => { privacyRef.current = privacyPreferences; }, [privacyPreferences]);
   useEffect(() => { languageRef.current = language; }, [language]);
   useEffect(() => { userNameRef.current = userName; }, [userName]);
   useEffect(() => { lastCheckInRef.current = lastCheckInTime; }, [lastCheckInTime]);
+  useEffect(() => { isCheckInDueRef.current = isCheckInDue; }, [isCheckInDue]);
 
   useEffect(() => {
     loadStoredData();
     if (Platform.OS !== "web") setupNotifications();
+
+    // AppState listener: re-evaluate check-in when app returns to foreground
+    if (Platform.OS !== "web") {
+      const sub = AppState.addEventListener("change", (state) => {
+        if (state === "active") {
+          reEvaluateCheckIn();
+        }
+      });
+      return () => {
+        sub.remove();
+        if (checkInTimerRef.current) clearTimeout(checkInTimerRef.current);
+        if (autoAlertTimerRef.current) clearTimeout(autoAlertTimerRef.current);
+        if (inactivityTickRef.current) clearInterval(inactivityTickRef.current);
+      };
+    }
+
     return () => {
       if (checkInTimerRef.current) clearTimeout(checkInTimerRef.current);
       if (autoAlertTimerRef.current) clearTimeout(autoAlertTimerRef.current);
       if (inactivityTickRef.current) clearInterval(inactivityTickRef.current);
     };
+  }, []);
+
+  // Re-check timing when returning to foreground (native only)
+  const reEvaluateCheckIn = useCallback(async () => {
+    if (isCheckInDueRef.current) return; // already showing modal
+    try {
+      const [storedCheckIn, storedDueSince] = await Promise.all([
+        AsyncStorage.getItem(STORAGE_KEYS.lastCheckIn),
+        AsyncStorage.getItem(STORAGE_KEYS.checkInDueSince),
+      ]);
+      const now = Date.now();
+      if (storedCheckIn) {
+        const lastTime = new Date(storedCheckIn).getTime();
+        const elapsed = now - lastTime;
+        if (elapsed >= CHECK_IN_INTERVAL_MS) {
+          // Check-in overdue — show modal
+          const lang = languageRef.current;
+          const choices = CHECK_IN_QUESTIONS[lang] ?? CHECK_IN_QUESTIONS.en;
+          setCheckInQuestion(choices[Math.floor(Math.random() * choices.length)]);
+          setIsCheckInDue(true);
+          isCheckInDueRef.current = true;
+          setCareStatus("no_response");
+          const dueSince = storedDueSince ? parseInt(storedDueSince) : now - (elapsed - CHECK_IN_INTERVAL_MS);
+          const overdue = now - dueSince;
+          if (overdue >= NO_RESPONSE_ALERT_MS) {
+            triggerAutoAlert();
+          } else {
+            scheduleNoResponseAlert(NO_RESPONSE_ALERT_MS - overdue);
+          }
+        } else {
+          // Still time left — reset the timer for remaining duration
+          if (checkInTimerRef.current) clearTimeout(checkInTimerRef.current);
+          scheduleCheckIn(CHECK_IN_INTERVAL_MS - elapsed);
+        }
+      }
+    } catch {}
   }, []);
 
   const addAlert = useCallback((alert: CareAlert) => {
@@ -210,12 +295,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const choices = CHECK_IN_QUESTIONS[lang] ?? CHECK_IN_QUESTIONS.en;
       setCheckInQuestion(choices[Math.floor(Math.random() * choices.length)]);
       setIsCheckInDue(true);
+      isCheckInDueRef.current = true;
       setCareStatus("no_response");
       const dueSince = Date.now();
       AsyncStorage.setItem(STORAGE_KEYS.checkInDueSince, dueSince.toString()).catch(() => {});
       scheduleNoResponseAlert(NO_RESPONSE_ALERT_MS);
-      if (Platform.OS !== "web") scheduleCheckInNotification();
+      if (Platform.OS !== "web") {
+        scheduleCheckInNotification(lang, NO_RESPONSE_ALERT_MS);
+      }
     }, Math.max(0, delayMs));
+
+    // Also schedule a local notification as a backup trigger for native
+    if (Platform.OS !== "web") {
+      scheduleCheckInNotification(languageRef.current, delayMs);
+    }
   }, [scheduleNoResponseAlert]);
 
   const loadStoredData = async () => {
@@ -265,7 +358,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         lastCheckInRef.current = lastTime;
         const elapsed = now - lastTime.getTime();
         if (elapsed >= CHECK_IN_INTERVAL_MS) {
+          const lang = languageRef.current;
+          const choices = CHECK_IN_QUESTIONS[lang] ?? CHECK_IN_QUESTIONS.en;
+          setCheckInQuestion(choices[Math.floor(Math.random() * choices.length)]);
           setIsCheckInDue(true);
+          isCheckInDueRef.current = true;
           setCareStatus("no_response");
           const dueSince = storedDueSince ? parseInt(storedDueSince) : now - (elapsed - CHECK_IN_INTERVAL_MS);
           await AsyncStorage.setItem(STORAGE_KEYS.checkInDueSince, dueSince.toString()).catch(() => {});
@@ -274,7 +371,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           else scheduleNoResponseAlert(NO_RESPONSE_ALERT_MS - overdue);
         } else {
           setCareStatus("ok");
-          scheduleCheckIn(CHECK_IN_INTERVAL_MS - elapsed);
+          const remaining = CHECK_IN_INTERVAL_MS - elapsed;
+          scheduleCheckIn(remaining);
           setInactivityMinutesLeft(null);
         }
       } else {
@@ -406,14 +504,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return updated;
     });
     if (Platform.OS !== "web") {
-      const [hours, minutes] = next.time.split(":").map(Number);
-      const trigger = new Date();
-      trigger.setHours(hours || 0, minutes || 0, 0, 0);
-      if (trigger.getTime() <= Date.now()) trigger.setDate(trigger.getDate() + 1);
-      Notifications.scheduleNotificationAsync({
-        content: { title: "Reminder", body: next.task, channelId: "checkin" },
-        trigger: trigger as unknown as Notifications.NotificationTriggerInput,
-      }).catch(() => {});
+      try {
+        const [hours, minutes] = next.time.split(":").map(Number);
+        const trigger = new Date();
+        trigger.setHours(hours || 0, minutes || 0, 0, 0);
+        if (trigger.getTime() <= Date.now()) trigger.setDate(trigger.getDate() + 1);
+        await Notifications.scheduleNotificationAsync({
+          content: { title: "Reminder", body: next.task, channelId: "checkin" },
+          trigger: trigger as unknown as Notifications.NotificationTriggerInput,
+        });
+      } catch {}
     }
     return next;
   }, []);
@@ -437,6 +537,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const dismissCheckIn = useCallback(async () => {
     const now = new Date();
     setIsCheckInDue(false);
+    isCheckInDueRef.current = false;
     setCareStatus("ok");
     setInactivityMinutesLeft(null);
     setLastCheckInTime(now);
@@ -453,6 +554,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const callForHelp = useCallback(() => {
     setIsCheckInDue(false);
+    isCheckInDueRef.current = false;
     setCareStatus("emergency");
     const now = new Date();
     setLastCheckInTime(now);
