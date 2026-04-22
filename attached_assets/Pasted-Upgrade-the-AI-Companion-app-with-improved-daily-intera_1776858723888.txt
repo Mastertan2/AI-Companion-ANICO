@@ -1,0 +1,182 @@
+Upgrade the AI Companion app with improved daily interaction, better usability for elderly users, and fix existing functional issues across iOS and Android.
+
+Maintain current stack (React + Tailwind + backend API).
+
+-----------------------------------
+1. DAILY WELLBEING & CONVERSATION SYSTEM
+-----------------------------------
+
+Add scheduled, human-like interactions:
+
+A. Time-based prompts:
+
+Morning (7–10am):
+- "Good morning ☀️ How are you feeling today?"
+- "What would you like to do today?"
+
+Meal times:
+- Breakfast (8–10am)
+- Lunch (12–2pm)
+- Dinner (6–8pm)
+
+Ask:
+- "Have you eaten?"
+- "What did you eat?"
+
+Random check-ins (1–2 times/day):
+- "What have you been doing?"
+- "Did you go for a walk?"
+
+-----------------------------------
+2. VOICE + CHAT RESPONSE IMPROVEMENTS
+-----------------------------------
+
+Fix issues:
+
+A. Tamil bug:
+- Ensure proper language support
+- Prevent "question mark" speech output
+- Use correct TTS voice for Tamil
+
+B. Prevent wrong language switching:
+- Do NOT randomly switch to Malay
+- Respect selected language setting
+
+-----------------------------------
+3. REMINDER MANAGEMENT (IMPORTANT)
+-----------------------------------
+
+Add full control:
+
+User can say:
+- "Mark my medicine as done"
+- "Cancel my 8pm reminder"
+
+Backend should return:
+{
+  intent: "update_reminder",
+  action: "mark_done" OR "cancel",
+  data: { task: "...", time: "..." }
+}
+
+Frontend:
+- Update reminder list accordingly
+
+-----------------------------------
+4. TIME FORMAT FIX
+-----------------------------------
+
+Change all time display:
+
+- Use 12-hour format (e.g. 8:00 PM)
+- Add context:
+  - Morning
+  - Afternoon
+  - Evening
+  - Night
+
+Example:
+"8:00 PM (Evening)"
+
+-----------------------------------
+5. UI IMPROVEMENTS (CRITICAL)
+-----------------------------------
+
+- Increase text size (especially chat page)
+- Increase button size
+- Ensure readability for elderly
+
+-----------------------------------
+6. CONTACT ACTION IMPROVEMENTS
+-----------------------------------
+
+A. Calling:
+- When user says "Call my son"
+→ Automatically trigger call
+→ Do NOT require extra button tap
+
+- Match contact name correctly
+- Avoid calling raw number unless needed
+
+B. Messaging:
+- Improve message crafting:
+User:
+"Text my son I need to meet him for lunch tomorrow"
+
+→ Open WhatsApp chat with pre-filled message
+
+-----------------------------------
+7. GOOGLE MAP IMPROVEMENT
+-----------------------------------
+
+When navigating:
+
+- Auto open directions mode
+- Do NOT require extra click
+
+Use:
+https://www.google.com/maps/dir/?api=1&destination={location}
+
+-----------------------------------
+8. CALENDAR INTEGRATION (BASIC)
+-----------------------------------
+
+Allow AI to read stored events:
+
+User:
+"When is John's birthday?"
+
+→ Read from stored reminders/calendar
+→ Respond in voice
+
+-----------------------------------
+9. CAREGIVER PAGE IMPROVEMENT
+-----------------------------------
+
+If permission enabled:
+
+- Show real-time location of elderly
+- Display clearly on screen
+
+-----------------------------------
+10. ANDROID COMPATIBILITY FIX
+-----------------------------------
+
+Fix issues:
+
+- Singpass should attempt to open app first
+- If fail → fallback to website
+
+- Fix missing icons:
+  - Use emojis or cross-platform icon library
+
+- Ensure all buttons work on Android Chrome
+
+-----------------------------------
+11. VOICE EXPERIENCE IMPROVEMENT
+-----------------------------------
+
+- Ensure auto-stop recording works properly
+- Improve accuracy with SEA-LION normalization
+
+-----------------------------------
+12. GENERAL UX POLISH
+-----------------------------------
+
+- Speak all responses clearly
+- Add confirmation for actions:
+  "Calling your son now"
+
+- Add feedback:
+  "Opening maps"
+  "Sending message"
+
+-----------------------------------
+GOAL
+-----------------------------------
+
+Make the app feel like a real daily companion that:
+- Talks naturally
+- Understands elderly users
+- Takes actions automatically
+- Works reliably on both Android and iOS
