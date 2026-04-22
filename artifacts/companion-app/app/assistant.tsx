@@ -483,6 +483,9 @@ export default function AssistantScreen() {
         const result = await normalizeSpeech(trimmed);
         const original = result.changed ? trimmed : undefined;
         await sendMessage(result.normalized, original);
+      } catch {
+        // fallback: try sending the raw transcript if normalization chain fails
+        try { await sendMessage(trimmed); } catch {}
       } finally {
         setIsNormalizing(false);
       }
@@ -526,7 +529,9 @@ export default function AssistantScreen() {
       if (transcript.trim()) {
         setIsRecording(false);
         setIsTranscribing(true);
-        normalizeAndSend(transcript).finally(() => setIsTranscribing(false));
+        normalizeAndSend(transcript)
+          .catch(() => {})
+          .finally(() => setIsTranscribing(false));
       }
     };
 
@@ -691,9 +696,13 @@ export default function AssistantScreen() {
     recordActivity();
     setNoSpeechDetected(false);
     if (isRecording) {
-      Platform.OS === "web" ? stopWebMic() : stopNativeMic();
+      Platform.OS === "web" ? stopWebMic() : stopNativeMic().catch(() => {});
     } else {
-      Platform.OS === "web" ? startWebMic() : startNativeMic();
+      if (Platform.OS === "web") {
+        startWebMic().catch(() => {});
+      } else {
+        startNativeMic().catch(() => {});
+      }
     }
   };
 
