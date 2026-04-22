@@ -23,12 +23,14 @@ import { ContactPickerSheet } from "@/components/ContactPickerSheet";
 import { translations } from "@/constants/translations";
 import { type EmergencyContact, useApp } from "@/context/AppContext";
 import { useColors } from "@/hooks/useColors";
+import { normalizeSpeech } from "@/utils/sealionService";
 
 interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
   action?: ActionResult | null;
+  originalSpeech?: string;
 }
 
 interface ActionResult {
@@ -147,7 +149,7 @@ export default function AssistantScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { language, isSpeechEnabled, emergencyContacts, recordActivity, addReminder } = useApp();
+  const { language, isSpeechEnabled, emergencyContacts, recordActivity, addReminder, sealionApiKey } = useApp();
   const t = translations[language];
 
   const [messages, setMessages] = useState<Message[]>([]);
@@ -160,6 +162,7 @@ export default function AssistantScreen() {
   const [webSpeechSupported, setWebSpeechSupported] = useState(false);
   const [vadLevel, setVadLevel] = useState(0);
   const [noSpeechDetected, setNoSpeechDetected] = useState(false);
+  const [isNormalizing, setIsNormalizing] = useState(false);
   const [pendingContactAction, setPendingContactAction] = useState<{
     mode: "call" | "whatsapp";
     contacts: EmergencyContact[];
@@ -401,12 +404,12 @@ export default function AssistantScreen() {
 
   /* ─── SEND MESSAGE ─── */
   const sendMessage = useCallback(
-    async (text: string) => {
+    async (text: string, originalSpeech?: string) => {
       const trimmed = text.trim();
       if (!trimmed || isSending) return;
 
       recordActivity();
-      const userMsg: Message = { id: makeId(), role: "user", content: trimmed };
+      const userMsg: Message = { id: makeId(), role: "user", content: trimmed, originalSpeech };
       setMessages((prev) => [userMsg, ...prev]);
       setInputText("");
       setIsSending(true);
@@ -469,6 +472,29 @@ export default function AssistantScreen() {
     [isSending, messages, speakText, language, emergencyContacts, executeAction, recordActivity]
   );
 
+  /* ─── NORMALIZE + SEND (SEA-LION pipeline for voice) ─── */
+  const normalizeAndSend = useCallback(
+    async (rawTranscript: string) => {
+      const trimmed = rawTranscript.trim();
+      if (!trimmed) return;
+
+      if (!sealionApiKey) {
+        await sendMessage(trimmed, undefined);
+        return;
+      }
+
+      setIsNormalizing(true);
+      try {
+        const result = await normalizeSpeech(trimmed, sealionApiKey);
+        const original = result.changed ? trimmed : undefined;
+        await sendMessage(result.normalized, original);
+      } finally {
+        setIsNormalizing(false);
+      }
+    },
+    [sealionApiKey, sendMessage]
+  );
+
   /* ─── WEB MIC (SpeechRecognition + AudioContext VAD) ─── */
   const startWebMic = useCallback(async () => {
     if (typeof window === "undefined") return;
@@ -505,7 +531,7 @@ export default function AssistantScreen() {
       if (transcript.trim()) {
         setIsRecording(false);
         setIsTranscribing(true);
-        sendMessage(transcript).finally(() => setIsTranscribing(false));
+        normalizeAndSend(transcript).finally(() => setIsTranscribing(false));
       }
     };
 
@@ -530,7 +556,7 @@ export default function AssistantScreen() {
     };
 
     recognition.start();
-  }, [language, sendMessage]);
+  }, [language, normalizeAndSend]);
 
   const stopWebMic = useCallback(() => {
     isStoppingRef.current = true;
@@ -587,7 +613,7 @@ export default function AssistantScreen() {
         if (res.ok) {
           const data = (await res.json()) as { text: string };
           if (data.text?.trim()) {
-            await sendMessage(data.text);
+            await normalizeAndSend(data.text);
           } else {
             setNoSpeechDetected(true);
           }
@@ -597,7 +623,7 @@ export default function AssistantScreen() {
     } finally {
       setIsTranscribing(false);
     }
-  }, [language, sendMessage]);
+  }, [language, normalizeAndSend]);
 
   const startNativeMic = async () => {
     try {
@@ -740,6 +766,16 @@ export default function AssistantScreen() {
             </Text>
           </View>
           {!isUser && renderActionChip(item.action)}
+          {isUser && item.originalSpeech && (
+            <View style={[styles.normNote, { backgroundColor: "#FFF0D6", borderRadius: 10 }]}>
+              <Text style={[styles.normOrig, { color: colors.mutedForeground }]}>
+                {`You said: "${item.originalSpeech}"`}
+              </Text>
+              <Text style={[styles.normInterp, { color: colors.primary }]}>
+                {`Understood: "${item.content}"`}
+              </Text>
+            </View>
+          )}
         </View>
       </View>
     );
@@ -897,20 +933,28 @@ export default function AssistantScreen() {
           )}
 
           {/* Processing banner */}
-          {micState === "transcribing" && (
+          {micState === "transcribing" && !isNormalizing && (
             <View style={[styles.statusBanner, { backgroundColor: colors.muted }]}>
               <ActivityIndicator
                 size="small"
                 color={colors.primary}
                 style={{ marginRight: 8 }}
               />
-              <Text
-                style={[
-                  styles.statusBannerText,
-                  { color: colors.mutedForeground },
-                ]}
-              >
+              <Text style={[styles.statusBannerText, { color: colors.mutedForeground }]}>
                 {t.transcribing}
+              </Text>
+            </View>
+          )}
+
+          {/* SEA-LION normalizing banner */}
+          {isNormalizing && (
+            <View style={[styles.statusBanner, { backgroundColor: "#FFF0D6", borderRadius: 10 }]}>
+              <ActivityIndicator size="small" color={colors.primary} style={{ marginRight: 8 }} />
+              <Text style={[styles.statusBannerText, { color: colors.primary }]}>
+                {language === "zh" ? "正在理解您的语言..."
+                  : language === "ms" ? "Memahami percakapan anda..."
+                  : language === "ta" ? "உங்கள் பேச்சை புரிந்துகொள்கிறது..."
+                  : "Understanding you..."}
               </Text>
             </View>
           )}
@@ -1141,4 +1185,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   keyboardToggleText: { fontSize: 14, fontFamily: "Inter_400Regular" },
+  normNote: { paddingHorizontal: 12, paddingVertical: 8, gap: 3 },
+  normOrig: { fontSize: 12, fontFamily: "Inter_400Regular", fontStyle: "italic" },
+  normInterp: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
 });

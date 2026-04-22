@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { type PrivacyKey, useApp } from "@/context/AppContext";
 import { useColors } from "@/hooks/useColors";
+import { normalizeSpeech } from "@/utils/sealionService";
 
 const PRIVACY_ITEMS: { key: PrivacyKey; label: string; desc: string }[] = [
   { key: "location", label: "Location", desc: "Share last known location in alerts" },
@@ -19,10 +20,20 @@ export default function SettingsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { privacyPreferences, updatePrivacyPreferences, userName, setUserName, isSpeechEnabled, toggleSpeech } = useApp();
+  const { privacyPreferences, updatePrivacyPreferences, userName, setUserName, isSpeechEnabled, toggleSpeech, sealionApiKey, setSealionApiKey } = useApp();
   const [nameDraft, setNameDraft] = useState(userName);
+  const [keyDraft, setKeyDraft] = useState(sealionApiKey);
+  const [keyVisible, setKeyVisible] = useState(false);
+  const [testStatus, setTestStatus] = useState<"idle" | "testing" | "ok" | "fail">("idle");
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
+
+  const testKey = async () => {
+    setTestStatus("testing");
+    const result = await normalizeSpeech("eh go jurong point lah", keyDraft);
+    setTestStatus(result.normalized !== "eh go jurong point lah" ? "ok" : "fail");
+    setTimeout(() => setTestStatus("idle"), 3000);
+  };
 
   const toggle = (key: PrivacyKey) => updatePrivacyPreferences({ ...privacyPreferences, [key]: !privacyPreferences[key] });
 
@@ -68,6 +79,79 @@ export default function SettingsScreen() {
           </View>
         </TouchableOpacity>
 
+        {/* SEA-LION language AI */}
+        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: 18 }]}>
+          <View style={styles.keyTitleRow}>
+            <Feather name="globe" size={26} color={colors.primary} />
+            <View style={styles.flex1}>
+              <Text style={[styles.cardTitle, { color: colors.foreground }]}>Dialect & Singlish AI</Text>
+              <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>
+                Uses SEA-LION to understand Singlish, Hokkien, Cantonese and mixed languages. Enter your API key to enable.
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.keyRow}>
+            <TextInput
+              style={[styles.input, styles.keyInput, { backgroundColor: colors.muted, color: colors.foreground, borderRadius: 14 }]}
+              value={keyDraft}
+              onChangeText={setKeyDraft}
+              placeholder="sk-... (SEA-LION API key)"
+              placeholderTextColor={colors.mutedForeground}
+              secureTextEntry={!keyVisible}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            <TouchableOpacity style={[styles.eyeBtn, { backgroundColor: colors.muted, borderRadius: 12 }]} onPress={() => setKeyVisible(v => !v)}>
+              <Feather name={keyVisible ? "eye-off" : "eye"} size={20} color={colors.mutedForeground} />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.keyActions}>
+            <TouchableOpacity
+              style={[styles.keyBtn, { backgroundColor: colors.primary, borderRadius: 12 }]}
+              onPress={() => { setSealionApiKey(keyDraft); }}
+            >
+              <Feather name="save" size={18} color={colors.primaryForeground} />
+              <Text style={[styles.keyBtnText, { color: colors.primaryForeground }]}>Save key</Text>
+            </TouchableOpacity>
+
+            {keyDraft.trim().length > 0 && (
+              <TouchableOpacity
+                style={[styles.keyBtn, { backgroundColor: colors.muted, borderRadius: 12 }]}
+                onPress={testKey}
+                disabled={testStatus === "testing"}
+              >
+                <Feather
+                  name={testStatus === "ok" ? "check-circle" : testStatus === "fail" ? "x-circle" : "zap"}
+                  size={18}
+                  color={testStatus === "ok" ? "#22C55E" : testStatus === "fail" ? colors.destructive : colors.mutedForeground}
+                />
+                <Text style={[styles.keyBtnText, { color: testStatus === "ok" ? "#22C55E" : testStatus === "fail" ? colors.destructive : colors.mutedForeground }]}>
+                  {testStatus === "testing" ? "Testing..." : testStatus === "ok" ? "Connected!" : testStatus === "fail" ? "Failed" : "Test key"}
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            {sealionApiKey.length > 0 && (
+              <TouchableOpacity
+                style={[styles.keyBtn, { backgroundColor: colors.muted, borderRadius: 12 }]}
+                onPress={() => { setSealionApiKey(""); setKeyDraft(""); }}
+              >
+                <Feather name="trash-2" size={18} color={colors.destructive} />
+                <Text style={[styles.keyBtnText, { color: colors.destructive }]}>Remove</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {sealionApiKey.length > 0 && (
+            <View style={[styles.activeRow, { backgroundColor: "#22C55E18", borderRadius: 10 }]}>
+              <Feather name="check-circle" size={16} color="#22C55E" />
+              <Text style={[styles.activeText, { color: "#22C55E" }]}>Dialect AI is active</Text>
+            </View>
+          )}
+        </View>
+
         <TouchableOpacity style={[styles.bigRow, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: 18 }]} onPress={() => router.push("/caregiver")}>
           <Feather name="monitor" size={28} color={colors.primary} />
           <View style={styles.flex1}>
@@ -99,4 +183,13 @@ const styles = StyleSheet.create({
   rowTitle: { fontSize: 18, fontFamily: "Inter_700Bold" },
   rowDesc: { fontSize: 14, fontFamily: "Inter_400Regular", marginTop: 3, lineHeight: 20 },
   bigRow: { minHeight: 76, flexDirection: "row", alignItems: "center", gap: 14, borderWidth: 1.5, padding: 16 },
+  keyTitleRow: { flexDirection: "row", gap: 12, alignItems: "flex-start" },
+  keyRow: { flexDirection: "row", gap: 10, alignItems: "center" },
+  keyInput: { flex: 1, minHeight: 56, paddingHorizontal: 16, fontSize: 16, fontFamily: "Inter_400Regular" },
+  eyeBtn: { width: 48, height: 56, alignItems: "center", justifyContent: "center" },
+  keyActions: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  keyBtn: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 16, paddingVertical: 12 },
+  keyBtnText: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  activeRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 10, paddingHorizontal: 14 },
+  activeText: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
 });

@@ -67,6 +67,8 @@ interface AppContextValue {
   recentAlerts: CareAlert[];
   userName: string;
   setUserName: (name: string) => void;
+  sealionApiKey: string;
+  setSealionApiKey: (key: string) => void;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -82,6 +84,7 @@ const STORAGE_KEYS = {
   checkInDueSince: "companion_checkin_due_since",
   speechEnabled: "companion_speech",
   lastActivity: "companion_last_activity",
+  sealionKey: "companion_sealion_key",
 };
 
 const CHECK_IN_INTERVAL_MS = 3 * 60 * 60 * 1000;
@@ -151,6 +154,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [isSpeechEnabled, setIsSpeechEnabled] = useState(true);
   const [inactivityMinutesLeft, setInactivityMinutesLeft] = useState<number | null>(null);
   const [careStatus, setCareStatus] = useState<CareStatus>("ok");
+  const [sealionApiKey, setSealionApiKeyState] = useState("");
 
   const checkInTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoAlertTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -220,7 +224,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const loadStoredData = async () => {
     try {
-      const [storedLang, storedContacts, storedPrivacy, storedReminders, storedAlerts, storedName, storedCheckIn, storedDueSince, storedSpeech, storedActivity] = await Promise.all([
+      const [storedLang, storedContacts, storedPrivacy, storedReminders, storedAlerts, storedName, storedCheckIn, storedDueSince, storedSpeech, storedActivity, storedSealion] = await Promise.all([
         AsyncStorage.getItem(STORAGE_KEYS.language),
         AsyncStorage.getItem(STORAGE_KEYS.contacts),
         AsyncStorage.getItem(STORAGE_KEYS.privacy),
@@ -231,6 +235,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         AsyncStorage.getItem(STORAGE_KEYS.checkInDueSince),
         AsyncStorage.getItem(STORAGE_KEYS.speechEnabled),
         AsyncStorage.getItem(STORAGE_KEYS.lastActivity),
+        AsyncStorage.getItem(STORAGE_KEYS.sealionKey),
       ]);
 
       if (storedLang) {
@@ -254,6 +259,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         userNameRef.current = storedName;
       }
       if (storedSpeech !== null) setIsSpeechEnabled(storedSpeech === "true");
+      if (storedSealion) setSealionApiKeyState(storedSealion);
 
       const now = Date.now();
       const lastActivityMs = storedActivity ? parseInt(storedActivity) : now;
@@ -479,12 +485,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     AsyncStorage.setItem(STORAGE_KEYS.userName, value).catch(() => {});
   }, []);
 
+  const setSealionApiKey = useCallback((key: string) => {
+    const value = key.trim();
+    setSealionApiKeyState(value);
+    if (value) {
+      AsyncStorage.setItem(STORAGE_KEYS.sealionKey, value).catch(() => {});
+    } else {
+      AsyncStorage.removeItem(STORAGE_KEYS.sealionKey).catch(() => {});
+    }
+  }, []);
+
   return (
     <AppContext.Provider value={{
       language, setLanguage, emergencyContacts, addEmergencyContact, updateEmergencyContact, removeEmergencyContact,
       privacyPreferences, updatePrivacyPreferences, reminders, addReminder, removeReminder, completeReminder,
       isCheckInDue, checkInQuestion, dismissCheckIn, callForHelp, alertChildren, lastCheckInTime,
       isSpeechEnabled, toggleSpeech, recordActivity, inactivityMinutesLeft, careStatus, recentAlerts, userName, setUserName,
+      sealionApiKey, setSealionApiKey,
     }}>
       {children}
     </AppContext.Provider>

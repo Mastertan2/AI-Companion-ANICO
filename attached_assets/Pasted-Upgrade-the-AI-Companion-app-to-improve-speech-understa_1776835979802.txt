@@ -1,0 +1,134 @@
+Upgrade the AI Companion app to improve speech understanding for local accents and mixed-language dialogue using SEA-LION AI.
+
+-----------------------------------
+1. PURPOSE
+-----------------------------------
+
+Improve understanding of:
+- Hokkien (basic phrases)
+- Cantonese (basic phrases)
+- Singlish / mixed English
+- Mixed languages (English + Chinese + Malay + Tamil)
+
+SEA-LION AI will be used to:
+- Clean and normalize transcribed speech
+- Convert informal or mixed-language speech into clear English instructions
+
+-----------------------------------
+2. SPEECH PROCESSING PIPELINE (IMPORTANT)
+-----------------------------------
+
+Implement this flow:
+
+1. User speaks
+2. Speech-to-text (Web Speech API or external STT)
+3. Send transcript to SEA-LION API
+4. SEA-LION returns normalized English text
+5. Send cleaned text to backend AI (/chat or /ask)
+
+-----------------------------------
+3. USER API KEY INPUT (IMPORTANT)
+-----------------------------------
+
+Add a Settings section:
+
+- Input field:
+  "Enter SEA-LION API Key"
+
+- Save API key securely in localStorage
+
+- Allow user to update/remove key
+
+-----------------------------------
+4. SEA-LION API INTEGRATION
+-----------------------------------
+
+Create a service file:
+- /utils/sealionService.js
+
+Function:
+- normalizeSpeech(text)
+
+Example request:
+
+POST https://api.sealion.ai/normalize
+Headers:
+  Authorization: Bearer {API_KEY}
+
+Body:
+{
+  "text": "eh help me open map go jurong point lah"
+}
+
+Expected response:
+{
+  "normalized_text": "Open Google Maps and navigate to Jurong Point"
+}
+
+-----------------------------------
+5. PROMPT TO SEA-LION (IMPORTANT)
+-----------------------------------
+
+When sending text to SEA-LION, instruct:
+
+"You are a language assistant. Convert informal, mixed-language, or dialect speech (including Hokkien, Cantonese, Singlish) into clear and simple English commands."
+
+-----------------------------------
+6. EXAMPLES (FOR MODEL BEHAVIOR)
+-----------------------------------
+
+Input → Output:
+
+"eh go orchard road lah"
+→ "Navigate to Orchard Road"
+
+"帮我开地图去 Jurong Point"
+→ "Open Google Maps and navigate to Jurong Point"
+
+"call my daughter leh"
+→ "Call my daughter"
+
+"play 周杰伦 song"
+→ "Play Jay Chou songs on YouTube"
+
+-----------------------------------
+7. FALLBACK SYSTEM (IMPORTANT)
+-----------------------------------
+
+If:
+- API key not provided
+- API fails
+- Timeout
+
+→ fallback to original transcript
+
+DO NOT break the app
+
+-----------------------------------
+8. PERFORMANCE
+-----------------------------------
+
+- Keep response fast (<2 seconds)
+- Show:
+  "Understanding you..."
+
+-----------------------------------
+9. USER FEEDBACK
+-----------------------------------
+
+Display:
+- Original speech
+- Interpreted command
+
+Example:
+You said: "eh play song lah"
+Understood: "Play music"
+
+-----------------------------------
+10. GOAL
+-----------------------------------
+
+Make the AI feel:
+- More natural for elderly users
+- Able to understand local accents and dialect
+- Reduce need to repeat commands
