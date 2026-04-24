@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ChatBubble } from '@/components/ChatBubble';
 import { VoiceButton } from '@/components/VoiceButton';
 import { handleIntent } from '@/utils/intentHandler';
+import { normalizeInput } from '@/utils/dialectMap';  
 
 interface Message {
   id: string;
@@ -74,6 +75,8 @@ export default function AssistantPage() {
 
   const sendMessage = async (text: string) => {
     if (!text.trim()) return;
+
+    const cleanedText = normalizeInput(text);
     
     const userMsg = { id: Date.now().toString(), text, isUser: true };
     setMessages(prev => [...prev, userMsg]);
@@ -85,7 +88,7 @@ export default function AssistantPage() {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text })
+        body: JSON.stringify({ message: cleanedText })
       });
       
       const data = await res.json();
